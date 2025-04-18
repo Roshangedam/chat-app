@@ -1,0 +1,52 @@
+<div class="chat-container">
+  <div class="chat-header">
+    <div class="back-button" routerLink="/">
+      <mat-icon>arrow_back</mat-icon>
+    </div>
+
+    <div class="conversation-info">
+      <h2 class="conversation-name">{{ getConversationName() }}</h2>
+      <div class="participant-status" *ngIf="!conversation?.groupChat">
+        <span class="status-indicator" [ngClass]="getParticipantStatus().toLowerCase()"></span>
+        <span class="status-text">{{ getParticipantStatus() | titlecase }}</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button mat-icon-button [matMenuTriggerFor]="menu">
+        <mat-icon>more_vert</mat-icon>
+      </button>
+      <mat-menu #menu="matMenu">
+        <button mat-menu-item>
+          <mat-icon>search</mat-icon>
+          <span>Search</span>
+        </button>
+        <button mat-menu-item *ngIf="conversation?.groupChat">
+          <mat-icon>group</mat-icon>
+          <span>View participants</span>
+        </button>
+        <button mat-menu-item>
+          <mat-icon>notifications_off</mat-icon>
+          <span>Mute notifications</span>
+        </button>
+      </mat-menu>
+    </div>
+  </div>
+
+  <!-- <div class="chat-body">
+    <app-message-list
+      [messages]="messages"
+      [loading]="isLoading"
+      [isTyping]="isTyping"
+      [typingUser]="typingUser">
+    </app-message-list>
+  </div> -->
+
+  <!-- <div class="chat-footer">
+    <app-message-input
+      [disabled]="isSending"
+      (messageSent)="sendMessage($event)"
+      (typing)="onTyping()">
+    </app-message-input>
+  </div> -->
+</div>

@@ -1,0 +1,94 @@
+# Application Configuration
+spring:
+  application:
+    name: chat-app-backend
+  
+  # Database Configuration
+  datasource:
+    url: jdbc:mysql://localhost:3306/chatapp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+#    username: chatuser
+#    password: chatpassword
+    username: root
+    password: roshan
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+  
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: chat-app-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.chat.app.backend.*
+  
+  # Security Configuration
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:xxx}
+            client-secret: ${GOOGLE_CLIENT_SECRET:xxx}
+            redirect-uri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - email
+              - profile
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/auth
+            token-uri: https://accounts.google.com/o/oauth2/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
+
+# Server Configuration
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.chat.app: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.springframework.kafka: INFO
+
+# Custom Application Properties
+app:
+  jwt:
+    secret: ${JWT_SECRET:verySecretKeyThatShouldBeChangedInProduction}
+    expiration-ms: 86400000 # 24 hours
+  cors:
+    allowed-origins: http://localhost:4200
+
+# Profile-specific configurations
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:mysql://mysql:3306/chatapp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+  kafka:
+    bootstrap-servers: kafka:9092
+
+app:
+  cors:
+    allowed-origins: http://frontend:4200
