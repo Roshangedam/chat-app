@@ -59,6 +59,34 @@ public class JwtUtils {
     }
 
     /**
+     * Generate a refresh token for a user.
+     *
+     * @param user the user entity
+     * @return the generated refresh token
+     */
+    public String generateRefreshToken(User user) {
+        // For refresh token, we use a longer expiration time (typically 7-30 days)
+        // Here we'll use 7 days (7 * 24 * 60 * 60 * 1000 = 604800000 ms)
+        int refreshTokenExpirationMs = 7 * 24 * 60 * 60 * 1000;
+        
+        return Jwts.builder()
+                .setSubject(user.getUsername())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date((new Date()).getTime() + refreshTokenExpirationMs))
+                .signWith(key(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+    
+    /**
+     * Get the JWT token expiration time in milliseconds.
+     *
+     * @return the JWT token expiration time in milliseconds
+     */
+    public int getJwtExpirationMs() {
+        return jwtExpirationMs;
+    }
+
+    /**
      * Get the signing key from the JWT secret.
      *
      * @return the signing key

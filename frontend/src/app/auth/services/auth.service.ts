@@ -1,9 +1,10 @@
-import { Injectable } from '@angular/core';
+import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { catchError, map, tap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { isPlatformBrowser } from '@angular/common';
 
 export interface User {
   id: number;
@@ -28,8 +29,9 @@ export interface AuthResponse {
   providedIn: 'root'
 })
 export class AuthService {
-  private baseUrl = `${environment.apiUrl}/auth`;
+  private baseUrl = `${environment.apiUrl}/api/auth`;
   private tokenExpirationTimer: any;
+  private isBrowser: boolean;
 
   // Observable sources
   private currentUserSubject = new BehaviorSubject<User | null>(null);
@@ -41,13 +43,20 @@ export class AuthService {
 
   constructor(
     private http: HttpClient,
-    private router: Router
+    private router: Router,
+    @Inject(PLATFORM_ID) private platformId: Object
   ) {
+    this.isBrowser = isPlatformBrowser(this.platformId);
     this.initAuthFromStorage();
   }
 
   // Initialize authentication state from local storage
   private initAuthFromStorage(): void {
+    if (!this.isBrowser) {
+      // Skip localStorage operations on the server
+      return;
+    }
+
     const userData = localStorage.getItem('userData');
     const token = localStorage.getItem('token');
 
@@ -70,7 +79,7 @@ export class AuthService {
 
   // Login with username/password
   login(email: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.baseUrl}/login`, { email, password })
+    return this.http.post<AuthResponse>(`${this.baseUrl}/signin`, { usernameOrEmail: email, password })
       .pipe(
         tap(response => this.handleAuthentication(response)),
         catchError(error => {
@@ -82,12 +91,14 @@ export class AuthService {
 
   // OAuth2 login (redirect to provider)
   loginWithGoogle(): void {
-    window.location.href = `${environment.apiUrl}/oauth2/authorization/google`;
+    if (this.isBrowser) {
+      window.location.href = `${environment.apiUrl}/oauth2/authorization/google`;
+    }
   }
 
   // Handle OAuth2 callback
   handleOAuth2Callback(code: string, state: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/oauth2/callback`, { code, state })
+    return this.http.post<AuthResponse>(`${environment.apiUrl}/oauth2/callback`, { code, state })
       .pipe(
         tap(response => this.handleAuthentication(response)),
         catchError(error => {
@@ -100,7 +111,7 @@ export class AuthService {
   // Handle OAuth2 redirect with token
   handleOAuth2Redirect(token: string): Observable<AuthResponse> {
     // Verify and process the token
-    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/verify-token`, { token })
+    return this.http.post<AuthResponse>(`${environment.apiUrl}/oauth2/verify-token`, { token })
       .pipe(
         tap(response => this.handleAuthentication(response)),
         catchError(error => {
@@ -112,7 +123,7 @@ export class AuthService {
 
   // Register new user
   register(userData: { username: string, email: string, password: string, fullName?: string }): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.baseUrl}/register`, userData)
+    return this.http.post<AuthResponse>(`${this.baseUrl}/signup`, userData)
       .pipe(
         tap(response => this.handleAuthentication(response)),
         catchError(error => {
@@ -124,11 +135,13 @@ export class AuthService {
 
   // Logout user
   logout(): void {
-    // Clear local storage
-    localStorage.removeItem('userData');
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('tokenExpiration');
+    if (this.isBrowser) {
+      // Clear local storage only in browser
+      localStorage.removeItem('userData');
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('tokenExpiration');
+    }
 
     // Reset subjects
     this.currentUserSubject.next(null);
@@ -146,6 +159,10 @@ export class AuthService {
 
   // Refresh token
   refreshToken(): Observable<AuthResponse> {
+    if (!this.isBrowser) {
+      return throwError(() => new Error('Cannot refresh token on server'));
+    }
+    
     const refreshToken = localStorage.getItem('refreshToken');
 
     if (!refreshToken) {
@@ -188,7 +205,9 @@ export class AuthService {
             this.currentUserSubject.next({ ...currentUser, ...updatedUser });
 
             // Update local storage
-            localStorage.setItem('userData', JSON.stringify({ ...currentUser, ...updatedUser }));
+            if (this.isBrowser) {
+              localStorage.setItem('userData', JSON.stringify({ ...currentUser, ...updatedUser }));
+            }
           }
         }),
         catchError(error => {
@@ -200,6 +219,9 @@ export class AuthService {
 
   // Get JWT token
   getToken(): string | null {
+    if (!this.isBrowser) {
+      return null;
+    }
     return localStorage.getItem('token');
   }
 
@@ -216,15 +238,16 @@ export class AuthService {
   // Handle authentication response
   private handleAuthentication(response: AuthResponse): void {
     const { accessToken, refreshToken, user, expiresIn } = response;
-
     // Calculate token expiration
     const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
 
-    // Store auth data in local storage
-    localStorage.setItem('userData', JSON.stringify(user));
-    localStorage.setItem('token', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('tokenExpiration', expirationDate.toISOString());
+    // Store auth data in local storage (browser only)
+    if (this.isBrowser) {
+      localStorage.setItem('userData', JSON.stringify(user));
+      localStorage.setItem('token', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('tokenExpiration', expirationDate.toISOString());
+    }
 
     // Update subjects
     this.currentUserSubject.next(user);
@@ -236,8 +259,10 @@ export class AuthService {
 
   // Auto logout when token expires
   private autoLogout(expirationDuration: number): void {
-    this.tokenExpirationTimer = setTimeout(() => {
-      this.logout();
-    }, expirationDuration);
+    if (this.isBrowser) {
+      this.tokenExpirationTimer = setTimeout(() => {
+        this.logout();
+      }, expirationDuration);
+    }
   }
 }

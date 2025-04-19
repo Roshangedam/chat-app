@@ -128,7 +128,21 @@ public class WebSecurityConfig {
                 auth.requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/api/test/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
-                    .requestMatchers("/oauth2/**").permitAll()
+                    .requestMatchers("/api/oauth2/**").permitAll()
+                    .requestMatchers(
+                                "/auth/**",
+                                "/v2/api-docs",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**",
+                                "/swagger-resources",
+                                "/swagger-resources/**",
+                                "/configuration/ui",
+                                "/configuration/security",
+                                "/swagger-ui/**",
+                                "/webjars/**",
+                                "/swagger-ui.html"
+                    )
+                    .permitAll()
                     .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2

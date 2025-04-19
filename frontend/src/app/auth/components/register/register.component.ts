@@ -50,9 +50,11 @@ export class RegisterComponent implements OnInit {
 
   ngOnInit(): void {
     // If user is already logged in, redirect to home
-    if (this.authService.isAuthenticated()) {
-      this.router.navigate(['/']);
-    }
+    this.authService.isAuthenticated$.subscribe(isAuthenticated => {
+      if (isAuthenticated) {
+        this.router.navigate(['/']);
+      }
+    });
   }
 
   passwordMatchValidator(form: FormGroup) {
