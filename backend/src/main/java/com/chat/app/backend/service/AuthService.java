@@ -2,6 +2,7 @@ package com.chat.app.backend.service;
 
 import com.chat.app.backend.dto.auth.JwtResponse;
 import com.chat.app.backend.dto.auth.LoginRequest;
+import com.chat.app.backend.dto.auth.RefreshTokenRequest;
 import com.chat.app.backend.dto.auth.SignupRequest;
 import com.chat.app.backend.model.Role;
 import com.chat.app.backend.model.User;
@@ -9,6 +10,11 @@ import com.chat.app.backend.repository.RoleRepository;
 import com.chat.app.backend.repository.UserRepository;
 import com.chat.app.backend.security.jwt.JwtUtils;
 import com.chat.app.backend.security.jwt.UserDetailsImpl;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,6 +77,13 @@ public class AuthService {
             // Get user details from the authentication object
             UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
             
+            // Get user from repository to generate refresh token
+            User user = userRepository.findByUsername(userDetails.getUsername())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Generate refresh token
+            String refreshToken = jwtUtils.generateRefreshToken(user);
+            
             // Get user roles
             List<String> roles = userDetails.getAuthorities().stream()
                     .map(item -> item.getAuthority())
@@ -81,11 +94,12 @@ public class AuthService {
             // Return JWT response with token and user details
             return new JwtResponse(
                     jwt,
+                    refreshToken,
+                    jwtUtils.getJwtExpirationMs() / 1000,
                     userDetails.getId(),
-                    userDetails.getUsername(),
                     userDetails.getEmail(),
-                    userDetails.getFullName(),
-                    roles);
+                    userDetails.getUsername(),
+                    userDetails.getFullName());
         } catch (Exception e) {
             logger.error("Authentication failed for user: {}", loginRequest.getUsernameOrEmail(), e);
             throw e;
@@ -146,6 +160,54 @@ public class AuthService {
             return true;
         } catch (Exception e) {
             logger.error("Error during user registration: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+    
+    /**
+     * Refresh access token using refresh token.
+     *
+     * @param refreshToken the refresh token
+     * @return JWT response with new token and user details
+     */
+    public JwtResponse refreshToken(String refreshToken) {
+        logger.debug("Attempting to refresh token");
+        
+        try {
+            // Validate refresh token and extract username
+            String username = jwtUtils.getUserNameFromJwtToken(refreshToken);
+            
+            if (username == null) {
+                logger.error("Invalid refresh token");
+                throw new RuntimeException("Invalid refresh token");
+            }
+            
+            // Get user details
+            User user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> {
+                        logger.error("User not found for refresh token");
+                        return new RuntimeException("User not found for refresh token");
+                    });
+            
+            // Generate new access token
+            String accessToken = jwtUtils.generateJwtToken(user);
+            
+            // Generate new refresh token
+            String newRefreshToken = jwtUtils.generateRefreshToken(user);
+            
+            logger.info("Token refreshed successfully for user: {}", username);
+            
+            // Return JWT response with new tokens and user details
+            return new JwtResponse(
+                    accessToken,
+                    newRefreshToken,
+                    jwtUtils.getJwtExpirationMs() / 1000,
+                    user.getId(),
+                    user.getEmail(),
+                    user.getUsername(),
+                    user.getFullName());
+        } catch (Exception e) {
+            logger.error("Token refresh failed: {}", e.getMessage(), e);
             throw e;
         }
     }

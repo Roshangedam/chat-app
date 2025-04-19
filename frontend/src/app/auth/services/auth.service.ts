@@ -141,6 +141,7 @@ export class AuthService {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('tokenExpiration');
+      localStorage.removeItem('isOAuth2User');
     }
 
     // Reset subjects
@@ -162,9 +163,10 @@ export class AuthService {
     if (!this.isBrowser) {
       return throwError(() => new Error('Cannot refresh token on server'));
     }
-    
+
     const refreshToken = localStorage.getItem('refreshToken');
     const accessToken = localStorage.getItem('token');
+    const isOAuth2User = localStorage.getItem('isOAuth2User') === 'true';
 
     // If no refresh token is available or it's empty, we can't refresh
     if (!refreshToken || refreshToken === '') {
@@ -173,8 +175,16 @@ export class AuthService {
       this.logout();
       return throwError(() => new Error('Your session has expired. Please log in again.'));
     }
-    
-    return this.http.post<AuthResponse>(`${this.baseUrl}/refresh-token`, { refreshToken })
+
+    // Use the appropriate endpoint based on authentication type
+    const refreshEndpoint = isOAuth2User
+      ? `${environment.apiUrl}/api/oauth2/refresh-token`
+      : `${this.baseUrl}/refresh-token`;
+
+    // Ensure we're sending the refresh token in the correct format expected by the backend
+    // The backend expects a RefreshTokenRequest object with a refreshToken property
+    console.log('Sending refresh token request with token:', refreshToken);
+    return this.http.post<AuthResponse>(refreshEndpoint, { refreshToken: refreshToken })
       .pipe(
         tap(response => this.handleAuthentication(response)),
         catchError(error => {
@@ -227,22 +237,22 @@ export class AuthService {
     if (!this.isBrowser) {
       return null;
     }
-    
+
     const token = localStorage.getItem('token');
-    
+
     // Validate token exists and is not empty
     if (!token || token === '') {
       console.warn('No valid token found in storage');
       return null;
     }
-    
+
     // Check if token is expired based on stored expiration
     const tokenExpiration = localStorage.getItem('tokenExpiration');
     if (tokenExpiration && new Date(tokenExpiration) <= new Date()) {
       console.warn('Token has expired, returning null');
       return null;
     }
-    
+
     return token;
   }
 
@@ -261,7 +271,7 @@ export class AuthService {
     // Map backend response fields to frontend interface
     const accessToken = response.token || response.accessToken || '';
     const refreshToken = response.refreshToken || null;
-    
+
     // Handle different user object structures
     let user: User;
     if (response.user) {
@@ -276,9 +286,9 @@ export class AuthService {
         fullName: response.fullName || ''
       };
     }
-    
+
     const expiresIn = response.expiresIn || 3600; // Default to 1 hour if not provided
-    
+
     // Create a properly structured AuthResponse
     const authResponse: AuthResponse = {
       accessToken,
@@ -286,10 +296,10 @@ export class AuthService {
       user,
       expiresIn
     };
-    
+
     // Log the structured response for debugging
     console.log('Structured auth response:', authResponse);
-    
+
     // Validate token before proceeding
     if (!accessToken) {
       console.error('Authentication failed: No access token received');
@@ -299,12 +309,19 @@ export class AuthService {
     // Calculate token expiration
     const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
 
+    // Determine if this is an OAuth2 login
+    // We can detect this based on the request URL or a flag in the response
+    // For now, we'll use the URL path to determine if it's an OAuth2 login
+    const isOAuth2User = this.isBrowser && window.location.href.includes('oauth2') ||
+                         (user.username && user.username.includes('oauth2'));
+
     // Store auth data in local storage (browser only)
     if (this.isBrowser) {
       try {
         localStorage.setItem('userData', JSON.stringify(user));
         localStorage.setItem('token', accessToken);
-        
+        localStorage.setItem('isOAuth2User', String(isOAuth2User));
+
         // Only store a refresh token if it exists
         // This prevents storing empty strings that would fail token refresh checks
         if (refreshToken) {
@@ -313,7 +330,7 @@ export class AuthService {
           // If no refresh token is provided, remove any existing one
           localStorage.removeItem('refreshToken');
         }
-        
+
         localStorage.setItem('tokenExpiration', expirationDate.toISOString());
         console.log('Authentication data stored successfully');
       } catch (error) {

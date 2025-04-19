@@ -2,6 +2,7 @@ package com.chat.app.backend.controller;
 
 import com.chat.app.backend.dto.auth.JwtResponse;
 import com.chat.app.backend.dto.auth.LoginRequest;
+import com.chat.app.backend.dto.auth.RefreshTokenRequest;
 import com.chat.app.backend.dto.auth.SignupRequest;
 import com.chat.app.backend.service.AuthService;
 import jakarta.validation.Valid;
@@ -81,6 +82,29 @@ public class AuthController {
             logger.error("Registration failed with exception: {}", e.getMessage(), e);
             response.put("success", false);
             response.put("message", "Registration failed: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    /**
+     * Refresh access token using refresh token.
+     *
+     * @param refreshTokenRequest the refresh token request
+     * @return JWT response with new token and user details
+     */
+    @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
+        logger.debug("Received refresh token request");
+        
+        try {
+            JwtResponse jwtResponse = authService.refreshToken(refreshTokenRequest.getRefreshToken());
+            logger.info("Token refreshed successfully");
+            return ResponseEntity.ok(jwtResponse);
+        } catch (Exception e) {
+            logger.error("Token refresh failed: {}", e.getMessage(), e);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Token refresh failed: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
     }

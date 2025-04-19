@@ -17,10 +17,10 @@ export const TokenInterceptor: HttpInterceptorFn = (request: HttpRequest<unknown
   const router = inject(Router);
   const platformId = inject(PLATFORM_ID);
   const isBrowser = isPlatformBrowser(platformId);
-  
+
   // Skip token for auth endpoints
-  if (request.url.includes('/auth/login') || 
-      request.url.includes('/auth/register') || 
+  if (request.url.includes('/auth/login') ||
+      request.url.includes('/auth/register') ||
       request.url.includes('/auth/refresh-token')) {
     return next(request);
   }
@@ -33,7 +33,10 @@ export const TokenInterceptor: HttpInterceptorFn = (request: HttpRequest<unknown
   // Add token to request
   const token = authService.getToken();
   if (token) {
+    console.log('Adding token to request:', request.url);
     request = addToken(request, token);
+  } else {
+    console.warn('No token available for request:', request.url);
   }
 
   return next(request).pipe(
@@ -66,11 +69,13 @@ function handle401Error(request: HttpRequest<unknown>, next: HttpHandlerFn, auth
 
   // Check if we have a refresh token before attempting to refresh
   const refreshToken = localStorage.getItem('refreshToken');
+  const isOAuth2User = localStorage.getItem('isOAuth2User') === 'true';
+
   if (!refreshToken || refreshToken === '') {
     console.error('No refresh token available, cannot refresh');
     authService.logout();
     router.navigate(['/auth/login'], {
-      queryParams: { 
+      queryParams: {
         error: 'Your session has expired. Please log in again.',
         returnUrl: router.url
       }
@@ -85,22 +90,26 @@ function handle401Error(request: HttpRequest<unknown>, next: HttpHandlerFn, auth
     return authService.refreshToken().pipe(
       switchMap((response) => {
         isRefreshing = false;
+        // Store the new token in the subject
         refreshTokenSubject.next(response.accessToken);
-        return next(addToken(request, response.accessToken));
+        // Get the token from localStorage to ensure we're using the most up-to-date token
+        const newToken = localStorage.getItem('token');
+        // Use the token from localStorage if available, otherwise use the one from the response
+        return next(addToken(request, newToken || response.accessToken));
       }),
       catchError((error) => {
         isRefreshing = false;
         console.error('Token refresh failed:', error);
         authService.logout();
-        
+
         // Redirect to login page with error message
         router.navigate(['/auth/login'], {
-          queryParams: { 
+          queryParams: {
             error: 'Your session has expired. Please log in again.',
             returnUrl: router.url
           }
         });
-        
+
         return throwError(() => error);
       })
     );
@@ -108,7 +117,12 @@ function handle401Error(request: HttpRequest<unknown>, next: HttpHandlerFn, auth
     return refreshTokenSubject.pipe(
       filter(token => token !== null),
       take(1),
-      switchMap(token => next(addToken(request, token)))
+      switchMap(token => {
+        // Get the token from localStorage to ensure we're using the most up-to-date token
+        const currentToken = localStorage.getItem('token');
+        // Use the token from localStorage if available, otherwise use the one from the subject
+        return next(addToken(request, currentToken || token));
+      })
     );
   }
 }
