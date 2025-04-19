@@ -166,8 +166,8 @@ export class AuthService {
     const refreshToken = localStorage.getItem('refreshToken');
     const accessToken = localStorage.getItem('token');
 
-    // If no refresh token is available, we can't refresh
-    if (!refreshToken) {
+    // If no refresh token is available or it's empty, we can't refresh
+    if (!refreshToken || refreshToken === '') {
       console.error('No refresh token available, authentication session cannot be renewed');
       // Clear any existing auth data to force a clean login
       this.logout();
@@ -227,7 +227,23 @@ export class AuthService {
     if (!this.isBrowser) {
       return null;
     }
-    return localStorage.getItem('token');
+    
+    const token = localStorage.getItem('token');
+    
+    // Validate token exists and is not empty
+    if (!token || token === '') {
+      console.warn('No valid token found in storage');
+      return null;
+    }
+    
+    // Check if token is expired based on stored expiration
+    const tokenExpiration = localStorage.getItem('tokenExpiration');
+    if (tokenExpiration && new Date(tokenExpiration) <= new Date()) {
+      console.warn('Token has expired, returning null');
+      return null;
+    }
+    
+    return token;
   }
 
   // Check if user is authenticated
@@ -244,7 +260,7 @@ export class AuthService {
   private handleAuthentication(response: any): void {
     // Map backend response fields to frontend interface
     const accessToken = response.token || response.accessToken || '';
-    const refreshToken = response.refreshToken || '';
+    const refreshToken = response.refreshToken || null;
     
     // Handle different user object structures
     let user: User;
@@ -288,12 +304,16 @@ export class AuthService {
       try {
         localStorage.setItem('userData', JSON.stringify(user));
         localStorage.setItem('token', accessToken);
-        // Only store refresh token if it's not null or undefined
+        
+        // Only store a refresh token if it exists
+        // This prevents storing empty strings that would fail token refresh checks
         if (refreshToken) {
           localStorage.setItem('refreshToken', refreshToken);
         } else {
-          console.log('No refresh token provided by server, skipping storage');
+          // If no refresh token is provided, remove any existing one
+          localStorage.removeItem('refreshToken');
         }
+        
         localStorage.setItem('tokenExpiration', expirationDate.toISOString());
         console.log('Authentication data stored successfully');
       } catch (error) {

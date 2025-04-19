@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
+import { AuthService } from '../auth/services/auth.service';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 // Fix for SockJS import
 import SockJS from 'sockjs-client';
@@ -52,13 +53,38 @@ export class ChatService {
   public conversations$ = this.conversationsSubject.asObservable();
   public connectionStatus$ = this.connectionStatusSubject.asObservable();
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private authService: AuthService) {
     this.initializeWebSocketConnection();
+    
+    // Reinitialize WebSocket connection when authentication status changes
+    this.authService.isAuthenticated$.subscribe(isAuthenticated => {
+      if (isAuthenticated) {
+        // If we're authenticated and the connection is not established, initialize it
+        if (!this.connectionStatusSubject.value) {
+          this.initializeWebSocketConnection();
+        }
+      } else {
+        // If we're not authenticated, disconnect WebSocket
+        this.disconnect();
+      }
+    });
   }
 
   // Initialize WebSocket connection
   private initializeWebSocketConnection(): void {
     try {
+      // Get the latest token
+      const token = localStorage.getItem('token');
+      
+      // Don't initialize if no token is available
+      if (!token) {
+        console.warn('No authentication token available for WebSocket connection');
+        return;
+      }
+      
+      // Close existing connection if any
+      this.disconnect();
+      
       this.stompClient = new Client({
         webSocketFactory: () => new SockJS(environment.wsUrl),
         debug: (str) => console.debug(str),
@@ -67,7 +93,7 @@ export class ChatService {
         heartbeatOutgoing: 4000,
         // Add connect headers with token for authentication
         connectHeaders: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${token}`
         }
       });
 
@@ -101,6 +127,25 @@ export class ChatService {
       this.connectionStatusSubject.next(false);
     }
   }
+  
+  // Disconnect WebSocket connection
+  private disconnect(): void {
+    if (this.stompClient && this.stompClient.connected) {
+      try {
+        // Unsubscribe from all topics
+        this.subscriptions.forEach(subscription => subscription.unsubscribe());
+        this.subscriptions.clear();
+        
+        // Disconnect the client
+        this.stompClient.deactivate();
+        console.log('WebSocket connection closed');
+      } catch (error) {
+        console.error('Error disconnecting WebSocket:', error);
+      }
+    }
+    this.connectionStatusSubject.next(false);
+  }
+  
 
   // Subscribe to a conversation's messages
   subscribeToConversation(conversationId: number): void {
@@ -243,15 +288,15 @@ export class ChatService {
   }
 
   // Disconnect WebSocket when service is destroyed
-  disconnect(): void {
-    if (this.stompClient) {
-      this.stompClient.deactivate();
-    }
+  // disconnect(): void {
+  //   if (this.stompClient) {
+  //     this.stompClient.deactivate();
+  //   }
 
-    // Clear all subscriptions
-    this.subscriptions.forEach(subscription => subscription.unsubscribe());
-    this.subscriptions.clear();
+  //   // Clear all subscriptions
+  //   this.subscriptions.forEach(subscription => subscription.unsubscribe());
+  //   this.subscriptions.clear();
 
-    this.connectionStatusSubject.next(false);
-  }
+  //   this.connectionStatusSubject.next(false);
+  // }
 }
