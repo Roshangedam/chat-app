@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ChatService, Conversation } from '../../services/chat.service';
 import { CommonModule } from '@angular/common';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   imports: [CommonModule],
@@ -13,11 +14,14 @@ import { CommonModule } from '@angular/common';
 export class ConversationListComponent implements OnInit, OnDestroy {
   conversations: Conversation[] = [];
   selectedConversationId: number | null = null;
+  isLoading = false;
+  loadError = false;
   private subscriptions: Subscription = new Subscription();
 
   constructor(
     private chatService: ChatService,
-    private router: Router
+    private router: Router,
+    private snackBar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
@@ -37,8 +41,32 @@ export class ConversationListComponent implements OnInit, OnDestroy {
   }
 
   loadConversations(): void {
+    this.isLoading = true;
+    this.loadError = false;
+    
     this.chatService.getConversations().subscribe({
-      error: (error) => console.error('Error loading conversations:', error)
+      next: () => {
+        this.isLoading = false;
+      },
+      error: (error) => {
+        this.isLoading = false;
+        this.loadError = true;
+        console.error('Error loading conversations:', error);
+        
+        // Show a user-friendly error message
+        if (error.status === 401) {
+          this.snackBar.open('Your session has expired. Please log in again.', 'Dismiss', {
+            duration: 5000,
+            panelClass: ['error-snackbar']
+          });
+          // Redirect will be handled by the token interceptor
+        } else {
+          this.snackBar.open('Failed to load conversations. Please try again later.', 'Dismiss', {
+            duration: 5000,
+            panelClass: ['error-snackbar']
+          });
+        }
+      }
     });
   }
 
@@ -68,5 +96,9 @@ export class ConversationListComponent implements OnInit, OnDestroy {
 
   createNewConversation(): void {
     this.router.navigate(['/new-conversation']);
+  }
+
+  retry(): void {
+    this.loadConversations();
   }
 }

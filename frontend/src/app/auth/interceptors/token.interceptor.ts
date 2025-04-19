@@ -3,6 +3,7 @@ import { Observable, BehaviorSubject, throwError } from 'rxjs';
 import { catchError, filter, switchMap, take } from 'rxjs/operators';
 import { inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
+import { Router } from '@angular/router';
 
 // Global variables for the interceptor function
 let isRefreshing = false;
@@ -11,6 +12,7 @@ const refreshTokenSubject: BehaviorSubject<any> = new BehaviorSubject<any>(null)
 // Functional interceptor
 export const TokenInterceptor: HttpInterceptorFn = (request: HttpRequest<unknown>, next: HttpHandlerFn) => {
   const authService = inject(AuthService);
+  const router = inject(Router);
   
   // Skip token for auth endpoints
   if (request.url.includes('/auth/login') || 
@@ -28,8 +30,9 @@ export const TokenInterceptor: HttpInterceptorFn = (request: HttpRequest<unknown
   return next(request).pipe(
     catchError(error => {
       if (error instanceof HttpErrorResponse && error.status === 401) {
-        return handle401Error(request, next, authService);
+        return handle401Error(request, next, authService, router);
       } else {
+        console.error('HTTP Error:', error);
         return throwError(() => error);
       }
     })
@@ -46,7 +49,7 @@ function addToken(request: HttpRequest<unknown>, token: string): HttpRequest<unk
 }
 
 // Helper function to handle 401 errors
-function handle401Error(request: HttpRequest<unknown>, next: HttpHandlerFn, authService: AuthService): Observable<any> {
+function handle401Error(request: HttpRequest<unknown>, next: HttpHandlerFn, authService: AuthService, router: Router): Observable<any> {
   if (!isRefreshing) {
     isRefreshing = true;
     refreshTokenSubject.next(null);
@@ -59,7 +62,17 @@ function handle401Error(request: HttpRequest<unknown>, next: HttpHandlerFn, auth
       }),
       catchError((error) => {
         isRefreshing = false;
+        console.error('Token refresh failed:', error);
         authService.logout();
+        
+        // Redirect to login page with error message
+        router.navigate(['/auth/login'], {
+          queryParams: { 
+            error: 'Your session has expired. Please log in again.',
+            returnUrl: router.url
+          }
+        });
+        
         return throwError(() => error);
       })
     );
@@ -70,5 +83,4 @@ function handle401Error(request: HttpRequest<unknown>, next: HttpHandlerFn, auth
       switchMap(token => next(addToken(request, token)))
     );
   }
-
 }

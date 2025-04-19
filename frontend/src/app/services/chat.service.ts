@@ -58,25 +58,48 @@ export class ChatService {
 
   // Initialize WebSocket connection
   private initializeWebSocketConnection(): void {
-    this.stompClient = new Client({
-      webSocketFactory: () => new SockJS(environment.wsUrl),
-      debug: (str) => console.debug(str),
-      reconnectDelay: 5000,
-      heartbeatIncoming: 4000,
-      heartbeatOutgoing: 4000
-    });
+    try {
+      this.stompClient = new Client({
+        webSocketFactory: () => new SockJS(environment.wsUrl),
+        debug: (str) => console.debug(str),
+        reconnectDelay: 5000,
+        heartbeatIncoming: 4000,
+        heartbeatOutgoing: 4000,
+        // Add connect headers with token for authentication
+        connectHeaders: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
 
-    this.stompClient.onConnect = (frame) => {
-      console.log('Connected to WebSocket: ' + frame);
-      this.connectionStatusSubject.next(true);
-    };
+      this.stompClient.onConnect = (frame) => {
+        console.log('Connected to WebSocket: ' + frame);
+        this.connectionStatusSubject.next(true);
+      };
 
-    this.stompClient.onStompError = (frame) => {
-      console.error('WebSocket error: ' + frame.headers['message']);
-      console.error('Additional details: ' + frame.body);
-    };
+      this.stompClient.onStompError = (frame) => {
+        console.error('WebSocket error: ' + frame.headers['message']);
+        console.error('Additional details: ' + frame.body);
+        this.connectionStatusSubject.next(false);
+        
+        // Check if error is related to authentication
+        if (frame.headers['message']?.includes('Unauthorized') || 
+            frame.body?.includes('Unauthorized') ||
+            frame.headers['message']?.includes('401')) {
+          // Handle authentication error
+          console.error('WebSocket authentication failed. Please log in again.');
+        }
+      };
+      
+      this.stompClient.onWebSocketError = (event) => {
+        console.error('WebSocket connection error:', event);
+        this.connectionStatusSubject.next(false);
+      };
 
-    this.stompClient.activate();
+      this.stompClient.activate();
+    } catch (error) {
+      console.error('Failed to initialize WebSocket connection:', error);
+      this.connectionStatusSubject.next(false);
+    }
   }
 
   // Subscribe to a conversation's messages

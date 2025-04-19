@@ -50,6 +50,19 @@ export class LoginComponent implements OnInit {
     // Get return URL from route parameters or default to '/'
     this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
 
+    // Check for error message in query params (from token interceptor)
+    const errorParam = this.route.snapshot.queryParams['error'];
+    if (errorParam) {
+      this.errorMessage = errorParam;
+      // Make the error message more visible by adding a CSS class
+      setTimeout(() => {
+        const errorElement = document.querySelector('.error-message');
+        if (errorElement) {
+          errorElement.classList.add('session-expired');
+        }
+      }, 0);
+    }
+
     // Check if we have an OAuth2 callback
     this.route.queryParams.subscribe(params => {
       const code = params['code'];
@@ -64,6 +77,7 @@ export class LoginComponent implements OnInit {
       }
     });
   }
+  
 
   onSubmit(): void {
     if (this.loginForm.invalid) {
@@ -76,50 +90,70 @@ export class LoginComponent implements OnInit {
     const { email, password } = this.loginForm.value;
 
     this.authService.login(email, password).subscribe({
-      next: () => {
+      next: (response) => {
+        console.log('Login successful:', response);
         this.isLoading = false;
         this.router.navigateByUrl(this.returnUrl);
       },
       error: (error) => {
+        console.error('Login error details:', error);
         this.isLoading = false;
-        this.errorMessage = error.message || 'Login failed. Please try again.';
+        
+        // Handle different error formats
+        if (error.error && typeof error.error === 'object') {
+          // If error contains a structured error object
+          this.errorMessage = error.error.message || error.error.error || error.message || 'Login failed. Please try again.';
+        } else if (typeof error.error === 'string') {
+          // If error is a string
+          try {
+            const parsedError = JSON.parse(error.error);
+            this.errorMessage = parsedError.message || parsedError.error || 'Login failed. Please try again.';
+          } catch {
+            this.errorMessage = error.error || error.message || 'Login failed. Please try again.';
+          }
+        } else {
+          this.errorMessage = error.message || 'Login failed. Please try again.';
+        }
       }
     });
   }
 
-  loginWithGoogle(): void {
-    this.authService.loginWithGoogle();
+    loginWithGoogle(): void {
+      this.authService.loginWithGoogle();
+    }
+  
+    private handleOAuth2Callback(code: string, state: string): void {
+      this.isLoading = true;
+      this.errorMessage = '';
+  
+      this.authService.handleOAuth2Callback(code, state).subscribe({
+        next: () => {
+          this.isLoading = false;
+          this.router.navigateByUrl(this.returnUrl);
+        },
+        error: (error) => {
+          this.isLoading = false;
+          this.errorMessage = error.message || 'OAuth authentication failed. Please try again.';
+        }
+      });
+    }
+  
+    private handleOAuth2Redirect(token: string): void {
+      this.isLoading = true;
+      this.errorMessage = '';
+  
+      this.authService.handleOAuth2Redirect(token).subscribe({
+        next: () => {
+          this.isLoading = false;
+          this.router.navigateByUrl(this.returnUrl);
+        },
+        error: (error) => {
+          this.isLoading = false;
+          this.errorMessage = error.message || 'Token verification failed. Please try again.';
+        }
+      });
+    }
   }
 
-  private handleOAuth2Callback(code: string, state: string): void {
-    this.isLoading = true;
-    this.errorMessage = '';
+  
 
-    this.authService.handleOAuth2Callback(code, state).subscribe({
-      next: () => {
-        this.isLoading = false;
-        this.router.navigateByUrl(this.returnUrl);
-      },
-      error: (error) => {
-        this.isLoading = false;
-        this.errorMessage = error.message || 'OAuth authentication failed. Please try again.';
-      }
-    });
-  }
-
-  private handleOAuth2Redirect(token: string): void {
-    this.isLoading = true;
-    this.errorMessage = '';
-
-    this.authService.handleOAuth2Redirect(token).subscribe({
-      next: () => {
-        this.isLoading = false;
-        this.router.navigateByUrl(this.returnUrl);
-      },
-      error: (error) => {
-        this.isLoading = false;
-        this.errorMessage = error.message || 'Token verification failed. Please try again.';
-      }
-    });
-  }
-}

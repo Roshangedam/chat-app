@@ -164,18 +164,23 @@ export class AuthService {
     }
     
     const refreshToken = localStorage.getItem('refreshToken');
+    const accessToken = localStorage.getItem('token');
 
+    // If no refresh token is available, we can't refresh
     if (!refreshToken) {
-      return throwError(() => new Error('No refresh token available'));
+      console.error('No refresh token available, authentication session cannot be renewed');
+      // Clear any existing auth data to force a clean login
+      this.logout();
+      return throwError(() => new Error('Your session has expired. Please log in again.'));
     }
-
+    
     return this.http.post<AuthResponse>(`${this.baseUrl}/refresh-token`, { refreshToken })
       .pipe(
         tap(response => this.handleAuthentication(response)),
         catchError(error => {
           console.error('Token refresh error:', error);
           this.logout();
-          return throwError(() => new Error(error.error?.message || 'Token refresh failed'));
+          return throwError(() => new Error(error.error?.message || 'Your session has expired. Please log in again.'));
         })
       );
   }
@@ -236,17 +241,64 @@ export class AuthService {
   }
 
   // Handle authentication response
-  private handleAuthentication(response: AuthResponse): void {
-    const { accessToken, refreshToken, user, expiresIn } = response;
+  private handleAuthentication(response: any): void {
+    // Map backend response fields to frontend interface
+    const accessToken = response.token || response.accessToken || '';
+    const refreshToken = response.refreshToken || '';
+    
+    // Handle different user object structures
+    let user: User;
+    if (response.user) {
+      // If response contains a user object
+      user = response.user;
+    } else {
+      // If user data is at the root level
+      user = {
+        id: response.id || 0,
+        username: response.username || '',
+        email: response.email || '',
+        fullName: response.fullName || ''
+      };
+    }
+    
+    const expiresIn = response.expiresIn || 3600; // Default to 1 hour if not provided
+    
+    // Create a properly structured AuthResponse
+    const authResponse: AuthResponse = {
+      accessToken,
+      refreshToken,
+      user,
+      expiresIn
+    };
+    
+    // Log the structured response for debugging
+    console.log('Structured auth response:', authResponse);
+    
+    // Validate token before proceeding
+    if (!accessToken) {
+      console.error('Authentication failed: No access token received');
+      return;
+    }
+
     // Calculate token expiration
     const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
 
     // Store auth data in local storage (browser only)
     if (this.isBrowser) {
-      localStorage.setItem('userData', JSON.stringify(user));
-      localStorage.setItem('token', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('tokenExpiration', expirationDate.toISOString());
+      try {
+        localStorage.setItem('userData', JSON.stringify(user));
+        localStorage.setItem('token', accessToken);
+        // Only store refresh token if it's not null or undefined
+        if (refreshToken) {
+          localStorage.setItem('refreshToken', refreshToken);
+        } else {
+          console.log('No refresh token provided by server, skipping storage');
+        }
+        localStorage.setItem('tokenExpiration', expirationDate.toISOString());
+        console.log('Authentication data stored successfully');
+      } catch (error) {
+        console.error('Error storing authentication data:', error);
+      }
     }
 
     // Update subjects

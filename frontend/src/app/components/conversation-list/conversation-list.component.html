@@ -1,43 +1,47 @@
 <div class="conversation-list-container">
-  <div class="header">
-    <h2>Conversations</h2>
-    <button class="new-conversation-btn" (click)="createNewConversation()">
-      <i class="fa fa-plus"></i> New
-    </button>
+  <!-- Loading spinner -->
+  <div *ngIf="isLoading" class="loading-container">
+    <div class="spinner"></div>
+    <p>Loading conversations...</p>
   </div>
 
-  <div class="search-box">
-    <input type="text" placeholder="Search conversations..." />
-    <i class="fa fa-search"></i>
+  <!-- Error message -->
+  <div *ngIf="loadError" class="error-container">
+    <p>Unable to load your conversations</p>
+    <button (click)="retry()" class="retry-button">Try Again</button>
   </div>
 
-  <div class="conversations">
-    <div
-      *ngFor="let conversation of conversations"
-      class="conversation-item"
-      [class.active]="selectedConversationId === conversation.id"
-      (click)="selectConversation(conversation)"
-    >
-      <div class="avatar">
-        <img [src]="getAvatarUrl(conversation)" alt="Avatar" />
-      </div>
-      <div class="conversation-info">
-        <div class="conversation-header">
-          <h3 class="name">{{ getConversationName(conversation) }}</h3>
-          <span class="time">{{ conversation.updatedAt | date:'shortTime' }}</span>
+  <!-- Empty state -->
+  <div *ngIf="!isLoading && !loadError && conversations.length === 0" class="empty-container">
+    <p>No conversations yet</p>
+    <button (click)="createNewConversation()" class="new-conversation-button">Start a new conversation</button>
+  </div>
+
+  <!-- Conversation list -->
+  <div *ngIf="!isLoading && !loadError && conversations.length > 0" class="conversations">
+    <div class="conversation-header">
+      <h2>Conversations</h2>
+      <button (click)="createNewConversation()" class="new-conversation-button">
+        <span>New</span>
+      </button>
+    </div>
+    
+    <div class="conversation-items">
+      <div *ngFor="let conversation of conversations" 
+           class="conversation-item"
+           [class.selected]="conversation.id === selectedConversationId"
+           (click)="selectConversation(conversation)">
+        <div class="avatar">
+          <img [src]="getAvatarUrl(conversation)" alt="Avatar">
         </div>
-        <!-- <div class="last-message">
-          <p>{{ conversation.lastMessage?.content || 'No messages yet' }}</p>
-          <div class="unread-badge" *ngIf="conversation.unreadCount && conversation.unreadCount > 0">
-            {{ conversation.unreadCount }}
+        <!-- <div class="conversation-details">
+          <div class="conversation-name">{{ getConversationName(conversation) }}</div>
+          <div class="last-message" *ngIf="conversation.lastMessage">
+            {{ conversation.lastMessage.content | slice:0:30 }}
+            <span *ngIf="conversation.lastMessage.content.length > 30">...</span>
           </div>
         </div> -->
       </div>
-    </div>
-
-    <div class="no-conversations" *ngIf="conversations.length === 0">
-      <p>No conversations yet</p>
-      <button (click)="createNewConversation()">Start a new conversation</button>
     </div>
   </div>
 </div>
