@@ -23,6 +23,7 @@ export const TokenInterceptor: HttpInterceptorFn = (request: HttpRequest<unknown
   if (request.url.includes('/auth/login') ||
       request.url.includes('/auth/register') ||
       request.url.includes('/auth/refresh-token') ||
+      request.url.includes('/oauth2/refresh-token') ||
       // Skip token for logging endpoints to avoid circular dependency with LoggingService
       (environment.log?.apiUrl && request.url.includes(environment.log.apiUrl))) {
     return next(request);

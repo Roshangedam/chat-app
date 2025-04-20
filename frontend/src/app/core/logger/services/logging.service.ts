@@ -154,7 +154,7 @@ export class LoggingService {
         // Use XMLHttpRequest directly to avoid going through interceptors
         // This breaks the circular dependency with AuthService
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${environment.log.apiUrl}`, true);
+        xhr.open('POST', `${environment.log.apiUrl}/log`, true);
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {

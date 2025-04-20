@@ -125,11 +125,11 @@ public class WebSecurityConfig {
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> 
-                auth.requestMatchers("/api/auth/**").permitAll()
-                    .requestMatchers("/api/test/**").permitAll()
+                auth.requestMatchers("/api/v1/auth/**").permitAll()
+                    .requestMatchers("/api//v1/test/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
-                    .requestMatchers("/api/oauth2/**").permitAll()
-                    .requestMatchers("/v1/api/log/**").permitAll()
+                    .requestMatchers("/api/v1/oauth2/**").permitAll()
+                    .requestMatchers("/api/v1/logs/**").permitAll()
                     .requestMatchers(
                                 "/auth/**",
                                 "/v2/api-docs",

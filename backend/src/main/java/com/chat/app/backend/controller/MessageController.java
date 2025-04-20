@@ -15,7 +15,7 @@ import java.util.List;
  * REST Controller for message operations.
  */
 @RestController
-@RequestMapping("/api/messages")
+@RequestMapping("/api/v1/messages")
 public class MessageController {
 
     @Autowired

@@ -199,7 +199,7 @@ export class ChatService {
     }
 
     // Also send via REST API for persistence
-    return this.http.post<Message>(`${this.baseUrl}/messages/conversation/${conversationId}`, {
+    return this.http.post<Message>(`${this.baseUrl}/api/v1/messages/conversation/${conversationId}`, {
       content: content
     });
   }
@@ -221,12 +221,12 @@ export class ChatService {
     }
 
     // Also update via REST API
-    return this.http.put<number>(`${this.baseUrl}/messages/conversation/${conversationId}/read`, {});
+    return this.http.put<number>(`${this.baseUrl}/api/v1/messages/conversation/${conversationId}/read`, {});
   }
 
   // Get message history for a conversation
   getMessageHistory(conversationId: number, page: number = 0, size: number = 20): Observable<Message[]> {
-    return this.http.get<any>(`${this.baseUrl}/messages/conversation/${conversationId}?page=${page}&size=${size}`)
+    return this.http.get<any>(`${this.baseUrl}/api/v1/messages/conversation/${conversationId}?page=${page}&size=${size}`)
       .pipe(
         map(response => response.content),
         tap(messages => {
@@ -247,7 +247,7 @@ export class ChatService {
 
   // Get all conversations for the current user
   getConversations(): Observable<Conversation[]> {
-    return this.http.get<Conversation[]>(`${this.baseUrl}/conversations`)
+    return this.http.get<Conversation[]>(`${this.baseUrl}/api/v1/conversations`)
       .pipe(
         tap(conversations => this.conversationsSubject.next(conversations))
       );
@@ -255,12 +255,12 @@ export class ChatService {
 
   // Get a specific conversation by ID
   getConversation(conversationId: number): Observable<Conversation> {
-    return this.http.get<Conversation>(`${this.baseUrl}/conversations/${conversationId}`);
+    return this.http.get<Conversation>(`${this.baseUrl}/api/v1/conversations/${conversationId}`);
   }
 
   // Create a new one-to-one conversation
   createOneToOneConversation(participantId: number): Observable<Conversation> {
-    return this.http.post<Conversation>(`${this.baseUrl}/conversations/one-to-one`, { participantId })
+    return this.http.post<Conversation>(`${this.baseUrl}/api/v1/conversations/one-to-one`, { participantId })
       .pipe(
         tap(conversation => {
           const currentConversations = this.conversationsSubject.value;
@@ -271,7 +271,7 @@ export class ChatService {
 
   // Create a new group conversation
   createGroupConversation(name: string, description: string, participantIds: number[]): Observable<Conversation> {
-    return this.http.post<Conversation>(`${this.baseUrl}/conversations/group`, {
+    return this.http.post<Conversation>(`${this.baseUrl}/api/v1/conversations/group`, {
       name,
       description,
       participantIds
@@ -285,7 +285,7 @@ export class ChatService {
 
   // Get unread message count for a conversation
   getUnreadMessageCount(conversationId: number): Observable<number> {
-    return this.http.get<number>(`${this.baseUrl}/messages/conversation/${conversationId}/unread/count`);
+    return this.http.get<number>(`${this.baseUrl}/api/v1/messages/conversation/${conversationId}/unread/count`);
   }
 
   // Disconnect WebSocket when service is destroyed

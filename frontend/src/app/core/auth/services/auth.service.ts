@@ -30,7 +30,7 @@ export interface AuthResponse {
   providedIn: 'root'
 })
 export class AuthService {
-  private baseUrl = `${environment.apiUrl}/api/auth`;
+  private baseUrl = `${environment.apiUrl}/api/v1/auth`;
   private tokenExpirationTimer: any;
   private isBrowser: boolean;
 
@@ -113,14 +113,14 @@ export class AuthService {
   // OAuth2 login (redirect to provider)
   loginWithGoogle(): void {
     if (this.isBrowser) {
-      window.location.href = `${environment.apiUrl}/oauth2/authorization/google`;
+      window.location.href = `${environment.apiUrl}/api/v1/oauth2/authorization/google`;
     }
   }
 
   // Handle OAuth2 callback
   handleOAuth2Callback(code: string, state: string): Observable<AuthResponse> {
     this.loggingService.logInfo('Processing OAuth2 callback');
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/oauth2/callback`, { code, state })
+    return this.http.post<AuthResponse>(`${environment.apiUrl}/api/v1/oauth2/callback`, { code, state })
       .pipe(
         tap(response => {
           this.loggingService.logInfo(`OAuth2 authentication successful for user: ${response.user.username}`);
@@ -137,7 +137,7 @@ export class AuthService {
   handleOAuth2Redirect(token: string): Observable<AuthResponse> {
     this.loggingService.logInfo('Processing OAuth2 redirect with token');
     // Verify and process the token
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/oauth2/verify-token`, { token })
+    return this.http.post<AuthResponse>(`${environment.apiUrl}/api/v1/oauth2/verify-token`, { token })
       .pipe(
         tap(response => {
           this.loggingService.logInfo(`OAuth2 token verification successful for user: ${response.user.username}`);
@@ -221,7 +221,7 @@ export class AuthService {
 
     // Use the appropriate endpoint based on authentication type
     const refreshEndpoint = isOAuth2User
-      ? `${environment.apiUrl}/api/oauth2/refresh-token`
+      ? `${environment.apiUrl}/api/v1/oauth2/refresh-token`
       : `${this.baseUrl}/refresh-token`;
 
     // Ensure we're sending the refresh token in the correct format expected by the backend
@@ -319,6 +319,7 @@ export class AuthService {
   // Handle authentication response
   private handleAuthentication(response: any): void {
     // Map backend response fields to frontend interface
+    // Prioritize token field as that's what the backend is returning
     const accessToken = response.token || response.accessToken || '';
     const refreshToken = response.refreshToken || null;
 

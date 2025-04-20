@@ -22,7 +22,7 @@ import java.util.Map;
  */
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
-@RequestMapping("/api/oauth2")
+@RequestMapping("/api/v1/oauth2")
 public class OAuth2Controller {
 
     private static final Logger logger = LoggerFactory.getLogger(OAuth2Controller.class);
