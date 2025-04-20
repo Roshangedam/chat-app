@@ -6,6 +6,7 @@ import { AuthService } from '../services/auth.service';
 import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 import { PLATFORM_ID } from '@angular/core';
+import { environment } from '../../../../environments/environment';
 
 // Global variables for the interceptor function
 let isRefreshing = false;
@@ -18,10 +19,12 @@ export const TokenInterceptor: HttpInterceptorFn = (request: HttpRequest<unknown
   const platformId = inject(PLATFORM_ID);
   const isBrowser = isPlatformBrowser(platformId);
 
-  // Skip token for auth endpoints
+  // Skip token for auth endpoints and logging endpoints
   if (request.url.includes('/auth/login') ||
       request.url.includes('/auth/register') ||
-      request.url.includes('/auth/refresh-token')) {
+      request.url.includes('/auth/refresh-token') ||
+      // Skip token for logging endpoints to avoid circular dependency with LoggingService
+      (environment.log?.apiUrl && request.url.includes(environment.log.apiUrl))) {
     return next(request);
   }
 

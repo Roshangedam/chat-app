@@ -1,9 +1,10 @@
 import { Component, ElementRef, Input, NgModule, OnChanges, OnInit, SimpleChanges, ViewChild } from '@angular/core';
-import { Message } from '../../../services/chat.service';
-import { AuthService, User } from '../../../auth/services/auth.service';
+
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CommonModule, NgIf } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
+import { Message } from '../../services/chat.service';
+import { AuthService, User } from '../../../../core/auth/services/auth.service';
 
 @Component({
   imports: [CommonModule,NgIf, MatProgressSpinnerModule,MatIconModule],

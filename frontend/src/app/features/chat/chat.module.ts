@@ -2,47 +2,45 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { HttpClientModule } from '@angular/common/http';
+
+// Angular Material Imports
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatBadgeModule } from '@angular/material/badge';
 
-import { LoginComponent } from './components/login/login.component';
-import { RegisterComponent } from './components/register/register.component';
-import { ProfileComponent } from './components/profile/profile.component';
-import { AuthService } from './services/auth.service';
-import { AuthGuard } from './guards/auth.guard';
-import { TokenInterceptor } from './interceptors/token.interceptor';
+// Component Imports
+import { ChatComponent } from './components/chat/chat.component';
+import { MessageListComponent } from './components/message-list/message-list.component';
+import { MessageInputComponent } from './components/message-input/message-input.component';
 
 @NgModule({
   declarations: [
-    LoginComponent,
-    RegisterComponent,
-    ProfileComponent
+    ChatComponent,
+    MessageListComponent,
+    MessageInputComponent
   ],
   imports: [
     CommonModule,
     ReactiveFormsModule,
     RouterModule,
-    HttpClientModule,
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
     MatIconModule,
-    MatProgressSpinnerModule
-  ],
-  providers: [
-    AuthService,
-    AuthGuard
+    MatProgressSpinnerModule,
+    MatMenuModule,
+    MatBadgeModule
   ],
   exports: [
-    LoginComponent,
-    RegisterComponent,
-    ProfileComponent
+    ChatComponent,
+    MessageListComponent,
+    MessageInputComponent
   ]
 })
-export class AuthModule { }
+export class ChatModule { }

@@ -1,8 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { ChatService, Conversation, Message } from '../../../services/chat.service';
-import { AuthService, User } from '../../../auth/services/auth.service';
+import { ChatService, Conversation, Message } from '../../services/chat.service';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,6 +14,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MessageListComponent } from '../message-list/message-list.component';
 import { MessageInputComponent } from '../message-input/message-input.component';
+import { AuthService, User } from '../../../../core/auth/services/auth.service';
 
 @Component({
   selector: 'app-chat',

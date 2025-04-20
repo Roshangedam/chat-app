@@ -129,6 +129,7 @@ public class WebSecurityConfig {
                     .requestMatchers("/api/test/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
                     .requestMatchers("/api/oauth2/**").permitAll()
+                    .requestMatchers("/v1/api/log/**").permitAll()
                     .requestMatchers(
                                 "/auth/**",
                                 "/v2/api-docs",

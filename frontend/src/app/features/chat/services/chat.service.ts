@@ -2,11 +2,12 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
-import { AuthService } from '../auth/services/auth.service';
+
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 // Fix for SockJS import
 import SockJS from 'sockjs-client';
-import { environment } from '../../environments/environment';
+import { environment } from '../../../../environments/environment';
+import { AuthService } from '../../../core/auth/services/auth.service';
 
 export interface Message {
   id?: number;
@@ -55,7 +56,7 @@ export class ChatService {
 
   constructor(private http: HttpClient, private authService: AuthService) {
     this.initializeWebSocketConnection();
-    
+
     // Reinitialize WebSocket connection when authentication status changes
     this.authService.isAuthenticated$.subscribe(isAuthenticated => {
       if (isAuthenticated) {
@@ -75,16 +76,16 @@ export class ChatService {
     try {
       // Get the latest token
       const token = localStorage.getItem('token');
-      
+
       // Don't initialize if no token is available
       if (!token) {
         console.warn('No authentication token available for WebSocket connection');
         return;
       }
-      
+
       // Close existing connection if any
       this.disconnect();
-      
+
       this.stompClient = new Client({
         webSocketFactory: () => new SockJS(environment.wsUrl),
         debug: (str) => console.debug(str),
@@ -106,16 +107,16 @@ export class ChatService {
         console.error('WebSocket error: ' + frame.headers['message']);
         console.error('Additional details: ' + frame.body);
         this.connectionStatusSubject.next(false);
-        
+
         // Check if error is related to authentication
-        if (frame.headers['message']?.includes('Unauthorized') || 
+        if (frame.headers['message']?.includes('Unauthorized') ||
             frame.body?.includes('Unauthorized') ||
             frame.headers['message']?.includes('401')) {
           // Handle authentication error
           console.error('WebSocket authentication failed. Please log in again.');
         }
       };
-      
+
       this.stompClient.onWebSocketError = (event) => {
         console.error('WebSocket connection error:', event);
         this.connectionStatusSubject.next(false);
@@ -127,7 +128,7 @@ export class ChatService {
       this.connectionStatusSubject.next(false);
     }
   }
-  
+
   // Disconnect WebSocket connection
   private disconnect(): void {
     if (this.stompClient && this.stompClient.connected) {
@@ -135,7 +136,7 @@ export class ChatService {
         // Unsubscribe from all topics
         this.subscriptions.forEach(subscription => subscription.unsubscribe());
         this.subscriptions.clear();
-        
+
         // Disconnect the client
         this.stompClient.deactivate();
         console.log('WebSocket connection closed');
@@ -145,7 +146,7 @@ export class ChatService {
     }
     this.connectionStatusSubject.next(false);
   }
-  
+
 
   // Subscribe to a conversation's messages
   subscribeToConversation(conversationId: number): void {
