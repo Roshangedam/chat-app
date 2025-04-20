@@ -40,7 +40,6 @@ public class AuthController {
         try {
             JwtResponse jwtResponse = authService.authenticateUser(loginRequest);
             logger.info("User successfully authenticated: {}", loginRequest.getUsernameOrEmail());
-            System.err.println(jwtResponse);
             return ResponseEntity.ok(jwtResponse);
         } catch (Exception e) {
             logger.error("Authentication failed: {}", e.getMessage(), e);
