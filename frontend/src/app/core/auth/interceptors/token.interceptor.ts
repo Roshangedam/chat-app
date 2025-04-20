@@ -102,7 +102,36 @@ function handle401Error(request: HttpRequest<unknown>, next: HttpHandlerFn, auth
     return authService.refreshToken().pipe(
       switchMap((response) => {
         // Extract the new token from the response
-        const newToken = response.accessToken;
+        // The response can be either the token string directly or an object with accessToken property
+        let newToken = typeof response === 'string' ? response : response.accessToken;
+
+        if(!newToken){
+          newToken=""
+        }
+
+        // Validate token format (JWT tokens should have 2 periods)
+        if (!newToken.includes('.')) {
+          console.warn('Token format validation failed - token does not contain periods');
+          // If token doesn't have the expected format, try to decode it (it might be encoded)
+          try {
+            // It might be URL encoded or otherwise transformed
+            const decodedToken = decodeURIComponent(newToken);
+            if (decodedToken.includes('.')) {
+              console.log('Successfully decoded token to proper JWT format');
+              newToken = decodedToken;
+            }
+          } catch (e) {
+            console.error('Failed to decode potentially encoded token', e);
+          }
+        }
+
+        // Final validation check
+        if (newToken.split('.').length !== 3) {
+          console.warn(`Token format may be invalid: contains ${newToken.split('.').length - 1} periods instead of 2`);
+        }
+
+        // Store the new token in localStorage to ensure it's available for subsequent requests
+        localStorage.setItem('token', newToken);
 
         // Update the refreshTokenSubject with the new token
         refreshTokenSubject.next(newToken);
@@ -110,8 +139,14 @@ function handle401Error(request: HttpRequest<unknown>, next: HttpHandlerFn, auth
         // Log successful token refresh
         console.log('Token refreshed successfully, updating request with new token');
 
-        // Clone the request with the new token
-        return next(addToken(request, newToken));
+        // Add a small delay to ensure token is properly stored before continuing
+        return new Observable(observer => {
+          setTimeout(() => {
+            // Clone the request with the new token
+            observer.next(next(addToken(request, newToken)));
+            observer.complete();
+          }, 100); // 100ms delay
+        });
       }),
       catchError((error) => {
         // Handle token refresh failure

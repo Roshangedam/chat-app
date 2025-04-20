@@ -126,7 +126,7 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${environment.apiUrl}/api/v1/oauth2/callback`, { code, state })
       .pipe(
         tap(response => {
-          this.loggingService.logInfo(`OAuth2 authentication successful for user: ${response.user.username}`);
+          // this.loggingService.logInfo(`OAuth2 authentication successful for user: ${response.user.username}`);
           this.handleAuthentication(response);
         }),
         catchError(error => {
@@ -143,7 +143,7 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${environment.apiUrl}/api/v1/oauth2/verify-token`, { token })
       .pipe(
         tap(response => {
-          this.loggingService.logInfo(`OAuth2 token verification successful for user: ${response.user.username}`);
+          // this.loggingService.logInfo(`OAuth2 token verification successful for user: ${response.user.username}`);
           this.handleAuthentication(response);
         }),
         catchError(error => {
@@ -337,7 +337,7 @@ export class AuthService {
   private handleAuthentication(response: any): void {
     // Map backend response fields to frontend interface
     // Prioritize token fields and handle different response formats
-    const accessToken = response.accessToken || response.token || '';
+    let accessToken = response.accessToken || response.token || '';
     const refreshToken = response.refreshToken || '';
 
     // Handle different user object structures
@@ -361,6 +361,27 @@ export class AuthService {
     if (!accessToken) {
       this.loggingService.logError('Authentication failed: No access token received');
       return;
+    }
+
+    // Validate token format (JWT tokens should have 2 periods)
+    if (!accessToken.includes('.')) {
+      this.loggingService.logWarning('Token format validation failed - token does not contain periods');
+      // If token doesn't have the expected format, try to decode it (it might be encoded)
+      try {
+        // It might be URL encoded or otherwise transformed
+        const decodedToken = decodeURIComponent(accessToken);
+        if (decodedToken.includes('.')) {
+          this.loggingService.logInfo('Successfully decoded token to proper JWT format');
+          accessToken = decodedToken;
+        }
+      } catch (e) {
+        this.loggingService.logError('Failed to decode potentially encoded token', e);
+      }
+    }
+
+    // Final validation - token should have 2 periods for JWT format
+    if (accessToken.split('.').length !== 3) {
+      this.loggingService.logWarning(`Token format may be invalid: contains ${accessToken.split('.').length - 1} periods instead of 2`);
     }
 
     // Calculate token expiration - add a small buffer to ensure we refresh before actual expiry

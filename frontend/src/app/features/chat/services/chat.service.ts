@@ -83,10 +83,11 @@ export class ChatService {
         console.log('User data updated, reinitializing WebSocket connection with new token');
         // First disconnect to ensure clean reconnection with new token
         this.disconnect();
-        // Short delay to ensure disconnect completes before reconnecting
+        // Longer delay to ensure token refresh completes and disconnect finishes before reconnecting
         setTimeout(() => {
           this.initializeWebSocketConnection();
-        }, 100);
+          console.log('WebSocket connection reinitialized with new token');
+        }, 2000); // Increased from 1000ms to 2000ms to ensure token is fully refreshed and connection is established
       }
     });
   }
@@ -108,6 +109,11 @@ export class ChatService {
 
       // Log that we're initializing with a valid token
       console.log('Initializing WebSocket connection with valid token');
+      console.log('Opening Web Socket...');
+
+      // Store the token at the time of connection initialization
+      // This helps detect if the token changes during connection setup
+      const connectionToken = token;
 
       this.stompClient = new Client({
         webSocketFactory: () => new SockJS(environment.wsUrl),
@@ -117,13 +123,36 @@ export class ChatService {
         heartbeatOutgoing: 4000,
         // Add connect headers with token for authentication
         connectHeaders: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${connectionToken}`
+        },
+        // Add a beforeConnect callback to ensure we always use the latest token
+        beforeConnect: () => {
+          // Get the latest token right before connecting
+          const latestToken = this.authService.getToken();
+          if (latestToken && latestToken !== connectionToken) {
+            console.log('Token changed before connection, using latest token');
+            this.stompClient.connectHeaders = {
+              Authorization: `Bearer ${latestToken}`
+            };
+          }
         }
       });
 
       this.stompClient.onConnect = (frame) => {
         console.log('Connected to WebSocket: ' + frame);
         this.connectionStatusSubject.next(true);
+
+        // Check if token has changed during connection process
+        const currentToken = this.authService.getToken();
+        if (currentToken && currentToken !== connectionToken) {
+          console.log('Token changed during connection, reconnecting with new token');
+          // Disconnect and reconnect with new token
+          this.disconnect();
+          setTimeout(() => {
+            this.initializeWebSocketConnection();
+          }, 500);
+          return;
+        }
 
         // Re-subscribe to active conversations after reconnection
         // This ensures subscriptions are restored after token refresh
@@ -140,15 +169,44 @@ export class ChatService {
             frame.body?.includes('Unauthorized') ||
             frame.headers['message']?.includes('401')) {
           // Handle authentication error
-          console.error('WebSocket authentication failed. Please log in again.');
-          // Don't call logout here to avoid circular dependency
-          // Just clear the connection status
+          console.error('WebSocket authentication failed. Checking for token refresh');
+
+          // Implement a more robust token refresh detection mechanism
+          let retryCount = 0;
+          const maxRetries = 3;
+          const checkForNewToken = () => {
+            retryCount++;
+            const newToken = this.authService.getToken();
+
+            if (newToken && newToken !== connectionToken) {
+              console.log('New token detected after error, attempting to reconnect');
+              // Use a small delay to ensure token is fully processed
+              setTimeout(() => this.initializeWebSocketConnection(), 300);
+            } else if (this.authService.isAuthenticated() && retryCount < maxRetries) {
+              console.log(`Still authenticated but no new token, waiting longer (attempt ${retryCount}/${maxRetries})`);
+              // Exponential backoff for retries
+              setTimeout(checkForNewToken, 1000 * retryCount);
+            } else if (!this.authService.isAuthenticated()) {
+              console.log('No longer authenticated, not attempting to reconnect WebSocket');
+            } else {
+              console.log('Max retries reached, giving up on WebSocket reconnection');
+            }
+          };
+
+          // Start the token refresh detection process
+          setTimeout(checkForNewToken, 1000);
         }
       };
 
       this.stompClient.onWebSocketError = (event) => {
         console.error('WebSocket connection error:', event);
         this.connectionStatusSubject.next(false);
+
+        // Check if we're still authenticated and try to reconnect after a delay
+        if (this.authService.isAuthenticated()) {
+          console.log('WebSocket error while authenticated, will try to reconnect');
+          setTimeout(() => this.ensureConnection(), 3000);
+        }
       };
 
       this.stompClient.onWebSocketClose = () => {
@@ -318,6 +376,49 @@ export class ChatService {
 
   // Get all conversations for the current user
   getConversations(): Observable<Conversation[]> {
+    // Get a fresh token before making the request
+    const token = this.authService.getToken();
+
+    // If we're not authenticated or don't have a token, wait briefly to see if a token refresh is in progress
+    if (!token && this.authService.isAuthenticated()) {
+      console.log('No token available but authenticated, waiting for potential token refresh');
+      return new Observable<Conversation[]>(observer => {
+        // Wait for a longer time to allow token refresh to complete
+        setTimeout(() => {
+          const freshToken = this.authService.getToken();
+          if (freshToken) {
+            console.log('Fresh token obtained after waiting, proceeding with request');
+            // First ensure WebSocket connection is established with the new token
+            this.disconnect();
+            this.initializeWebSocketConnection();
+
+            // Wait for WebSocket connection to be established before making API request
+            setTimeout(() => {
+              // Validate token format before making request
+              if (freshToken.split('.').length !== 3) {
+                console.error('Invalid token format detected, token refresh may not be complete');
+                observer.error(new Error('Invalid token format'));
+                return;
+              }
+
+              // Retry the request with the new token
+              this.http.get<Conversation[]>(`${this.baseUrl}/api/v1/conversations`)
+                .pipe(
+                  tap(conversations => this.conversationsSubject.next(conversations))
+                ).subscribe({
+                  next: (conversations) => observer.next(conversations),
+                  error: (err) => observer.error(err),
+                  complete: () => observer.complete()
+                });
+            }, 1500); // Wait 1.5 seconds for WebSocket connection to establish
+          } else {
+            console.error('No token available after waiting, cannot proceed with request');
+            observer.error(new Error('Authentication token not available'));
+          }
+        }, 2000); // Increased wait time to 2 seconds for token refresh
+      });
+    }
+
     return this.http.get<Conversation[]>(`${this.baseUrl}/api/v1/conversations`)
       .pipe(
         tap(conversations => this.conversationsSubject.next(conversations)),
@@ -327,11 +428,42 @@ export class ChatService {
           // Handle unauthorized error specifically
           if (error.status === 401) {
             // Don't call logout here to avoid circular dependency
-            // Instead, check if we need to reconnect the WebSocket
+            // Instead, wait for token refresh to complete
             if (this.authService.isAuthenticated()) {
-              console.log('Received 401 while authenticated, attempting to reconnect WebSocket');
-              // Delay the reconnection to allow any token refresh to complete
-              setTimeout(() => this.ensureConnection(), 500);
+              console.log('Received 401 while authenticated, waiting for token refresh to complete');
+
+              // Wait longer to ensure token refresh completes
+              // This prevents the race condition where we try to reconnect before the token is refreshed
+              return new Observable<Conversation[]>(observer => {
+                setTimeout(() => {
+                  console.log('Attempting to reconnect after waiting for token refresh');
+                  // Get a fresh token after waiting
+                  const freshToken = this.authService.getToken();
+                  if (freshToken) {
+                    console.log('Fresh token obtained, reconnecting WebSocket');
+                    this.disconnect();
+                    this.initializeWebSocketConnection();
+
+                    // Increased delay to ensure WebSocket connection is fully established
+                    setTimeout(() => {
+                      console.log('WebSocket connection should be established, retrying API request');
+                      this.http.get<Conversation[]>(`${this.baseUrl}/api/v1/conversations`)
+                        .pipe(
+                          tap(conversations => this.conversationsSubject.next(conversations))
+                        ).subscribe({
+                          next: (conversations) => observer.next(conversations),
+                          error: (err) => {
+                            console.error('Still failed to load conversations after token refresh:', err);
+                            observer.error(err);
+                          },
+                          complete: () => observer.complete()
+                        });
+                    }, 2000); // Increased delay to 2 seconds after reconnecting WebSocket
+                  } else {
+                    observer.error(error); // Propagate original error if no fresh token
+                  }
+                }, 3000); // Increased wait time to 3 seconds for token refresh to complete
+              });
             }
           }
 
@@ -404,7 +536,24 @@ export class ChatService {
   // Check connection status and reconnect if needed
   public ensureConnection(): void {
     if (!this.connectionStatusSubject.value && this.authService.isAuthenticated()) {
-      this.initializeWebSocketConnection();
+      // Get a fresh token before reconnecting
+      const token = this.authService.getToken();
+      if (token) {
+        console.log('Ensuring WebSocket connection with valid token');
+        this.initializeWebSocketConnection();
+      } else {
+        console.log('No valid token available, waiting for potential token refresh');
+        // Wait briefly to see if a token refresh is in progress
+        setTimeout(() => {
+          const freshToken = this.authService.getToken();
+          if (freshToken) {
+            console.log('Fresh token obtained after waiting, initializing WebSocket connection');
+            this.initializeWebSocketConnection();
+          } else {
+            console.log('No token available after waiting, cannot establish WebSocket connection');
+          }
+        }, 2500); // Wait 2.5 seconds for token refresh
+      }
     }
   }
 }
