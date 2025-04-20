@@ -44,22 +44,58 @@ public class OAuth2Controller {
         logger.debug("Received OAuth2 callback with code: {} and state: {}", request.getCode(), request.getState());
         
         try {
-            // This endpoint would be called by the frontend when it receives the code and state
-            // from the OAuth2 provider. In a real implementation, you would exchange the code
-            // for an access token and then get the user info.
+            // This endpoint is called by the frontend when it receives the code and state
+            // from the OAuth2 provider.
             
-            // For demonstration purposes, we'll simulate getting a user from the OAuth2 provider
-            // In a real implementation, you would use the code to get an access token and then user info
-            User user = userService.findByUsername("oauth2user");
+            // In a real implementation, we would use the OAuth2 client to exchange the code
+            // for an access token and then get the user info. For now, we'll use the state
+            // parameter to identify the provider.
+            
+            String provider = "google"; // Default to Google as the provider
+            String providerId = request.getCode(); // Use code as provider ID for now
+            
+            // Try to find user by email from state (if available)
+            // In a real implementation, we would decode the state parameter or use a session
+            String email = null;
+            String name = null;
+            
+            // For demonstration, extract email from state if it's in email format
+            if (request.getState() != null && request.getState().contains("@")) {
+                email = request.getState();
+                name = email.substring(0, email.indexOf('@'));
+            } else {
+                // Generate a random email and name if not available
+                email = "user" + System.currentTimeMillis() + "@example.com";
+                name = "OAuth User";
+            }
+            
+            // Find or create user
+            User user = null;
+            
+            // Try to find by email first
+            if (email != null) {
+                user = userService.findByEmail(email);
+            }
             
             if (user == null) {
-                // Create a mock OAuth2 user if not found
-                // In a real implementation, you would create a user based on the OAuth2 provider's user info
+                // Create a new user
                 user = new User();
-                user.setId(1L);
-                user.setUsername("oauth2user");
-                user.setEmail("oauth2user@example.com");
-                user.setFullName("OAuth2 User");
+                user.setUsername(name.replaceAll("\\s+", "").toLowerCase());
+                user.setEmail(email);
+                user.setFullName(name);
+                user.setProvider(provider);
+                user.setProviderId(providerId);
+                user.setPassword(""); // No password for OAuth2 users
+                
+                // Save the user
+                user = userService.saveUser(user);
+            } else {
+                // Update existing user with OAuth2 info if needed
+                if (user.getProvider() == null) {
+                    user.setProvider(provider);
+                    user.setProviderId(providerId);
+                    user = userService.saveUser(user);
+                }
             }
             
             // Generate JWT tokens
@@ -76,7 +112,7 @@ public class OAuth2Controller {
                     user.getFullName()
             );
             
-            logger.info("Successfully processed OAuth2 callback for code: {}", request.getCode());
+            logger.info("Successfully processed OAuth2 callback for user: {}", user.getUsername());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Error processing OAuth2 callback: {}", e.getMessage(), e);
@@ -98,7 +134,16 @@ public class OAuth2Controller {
         logger.debug("Verifying token: {}", request.getToken().substring(0, Math.min(10, request.getToken().length())) + "...");
         
         try {
-            // Validate the token
+            // First, validate the token format and signature
+            if (!jwtUtils.validateJwtToken(request.getToken())) {
+                logger.warn("Invalid token format or signature");
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "Invalid token format or signature");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            // Extract username from token
             String username = jwtUtils.getUserNameFromJwtToken(request.getToken());
             
             if (username != null) {
@@ -122,15 +167,18 @@ public class OAuth2Controller {
                     ));
                 } else {
                     logger.warn("User not found for username: {}", username);
+                    Map<String, Object> errorResponse = new HashMap<>();
+                    errorResponse.put("success", false);
+                    errorResponse.put("message", "User not found");
+                    return ResponseEntity.badRequest().body(errorResponse);
                 }
             } else {
-                logger.warn("Invalid token provided");
+                logger.warn("Could not extract username from token");
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "Invalid token content");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
-            
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Invalid token");
-            return ResponseEntity.badRequest().body(errorResponse);
         } catch (Exception e) {
             logger.error("Error verifying token: {}", e.getMessage(), e);
             Map<String, Object> errorResponse = new HashMap<>();
