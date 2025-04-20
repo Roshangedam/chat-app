@@ -1,0 +1,51 @@
+<div class="sidebar-container">
+  <!-- Profile Section -->
+  <div class="profile-section">
+    <div class="avatar-container">
+      <img
+        [src]="currentUser?.avatarUrl || 'assets/images/default-avatar.png'"
+        alt="Profile Picture"
+        class="profile-avatar"
+      >
+      <span class="status-indicator" [ngClass]="currentUser?.status?.toLowerCase() || 'offline'"></span>
+    </div>
+
+    <div class="profile-info">
+      <h3 class="profile-name">{{ currentUser?.fullName || currentUser?.username || 'Guest User' }}</h3>
+      <p class="profile-status">{{ currentUser?.status || 'OFFLINE' | titlecase }}</p>
+    </div>
+
+    <button mat-icon-button [matMenuTriggerFor]="profileMenu" aria-label="Profile menu">
+      <mat-icon>more_vert</mat-icon>
+    </button>
+
+    <mat-menu #profileMenu="matMenu">
+      <button mat-menu-item routerLink="/auth/profile">
+        <mat-icon>account_circle</mat-icon>
+        <span>My Profile</span>
+      </button>
+      <button mat-menu-item (click)="logout()">
+        <mat-icon>exit_to_app</mat-icon>
+        <span>Logout</span>
+      </button>
+    </mat-menu>
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <!-- Navigation Menu -->
+  <div class="navigation-menu">
+    <mat-nav-list>
+      <a mat-list-item
+         *ngFor="let section of sections"
+         (click)="onSectionClick(section.id)"
+         [class.active]="activeSection === section.id">
+        <mat-icon matListItemIcon>{{ section.icon }}</mat-icon>
+        <span matListItemTitle>{{ section.label }}</span>
+        <span matListItemMeta *ngIf="section.id === 'chats'" class="badge-container">
+          <span class="badge" *ngIf="section.id === 'chats'">5</span>
+        </span>
+      </a>
+    </mat-nav-list>
+  </div>
+</div>

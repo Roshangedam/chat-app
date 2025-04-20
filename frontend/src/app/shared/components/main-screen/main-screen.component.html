@@ -1,0 +1,23 @@
+<div class="main-screen-container">
+  <!-- Welcome Screen (when no conversation is selected) -->
+  <div *ngIf="!conversation" class="welcome-screen">
+    <div class="welcome-content">
+      <img src="assets/images/chat-illustration.svg" alt="Chat Illustration" class="welcome-image">
+      <h2 class="welcome-title">Welcome to Chat App</h2>
+      <p class="welcome-text">Select a conversation to start chatting</p>
+    </div>
+  </div>
+
+  <!-- Chat Room (when conversation is selected) -->
+  <div *ngIf="conversation" class="chat-room-container">
+    <div class="chat-header">
+      <h2>{{ conversation.name }}</h2>
+    </div>
+    <div class="chat-body">
+      <p>Chat messages will appear here</p>
+    </div>
+    <div class="chat-footer">
+      <p>Message input will appear here</p>
+    </div>
+  </div>
+</div>

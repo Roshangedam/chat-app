@@ -1,0 +1,86 @@
+<div class="list-view-container">
+  <!-- Search and Action Bar -->
+  <div class="list-header">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search</mat-label>
+      <input matInput [(ngModel)]="searchQuery" placeholder="Search...">
+      <mat-icon matSuffix>search</mat-icon>
+    </mat-form-field>
+
+    <button mat-icon-button
+            *ngIf="activeSection === 'chats' || activeSection === 'groups'"
+            (click)="createNewGroup()"
+            matTooltip="New {{ activeSection === 'chats' ? 'Chat' : 'Group' }}">
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+
+  <!-- List Content -->
+  <div class="list-content">
+    <!-- Empty State -->
+    <div *ngIf="getFilteredItems().length === 0" class="empty-state">
+      <mat-icon class="empty-icon">{{ activeSection === 'chats' ? 'chat' :
+                                     activeSection === 'contacts' ? 'contacts' :
+                                     activeSection === 'groups' ? 'group' : 'info' }}</mat-icon>
+      <p class="empty-text">No {{ activeSection }} found</p>
+      <button mat-stroked-button color="primary" *ngIf="activeSection === 'chats' || activeSection === 'groups'">
+        Create New {{ activeSection === 'chats' ? 'Chat' : 'Group' }}
+      </button>
+    </div>
+
+    <!-- Conversations List -->
+    <mat-nav-list *ngIf="activeSection === 'chats' || activeSection === 'groups'">
+      <a mat-list-item
+         *ngFor="let conversation of getFilteredItems()"
+         (click)="onConversationClick(conversation)"
+         class="conversation-item">
+        <div matListItemAvatar class="avatar-container">
+          <img [src]="getAvatarUrl(conversation)" alt="Avatar" class="avatar">
+          <span *ngIf="!conversation.groupChat"
+                class="status-indicator"
+                [ngClass]="conversation.participants[0]?.status?.toLowerCase() || 'offline'"></span>
+        </div>
+
+        <div matListItemTitle class="conversation-title">
+          {{ getConversationName(conversation) }}
+        </div>
+
+        <div matListItemLine class="conversation-preview">
+          {{ conversation.lastMessage || 'No messages yet' }}
+        </div>
+
+        <div matListItemMeta class="conversation-meta">
+          <span class="time">{{ dateFormatter.formatConversationTime(conversation.updatedAt) }}</span>
+          <span class="badge" *ngIf="conversation.unreadCount && conversation.unreadCount > 0">
+            {{ conversation.unreadCount }}
+          </span>
+        </div>
+      </a>
+    </mat-nav-list>
+
+    <!-- Contacts List -->
+    <mat-nav-list *ngIf="activeSection === 'contacts' || activeSection === 'people'">
+      <a mat-list-item
+         *ngFor="let contact of getFilteredItems()"
+         (click)="onContactClick(contact)"
+         class="contact-item">
+        <div matListItemAvatar class="avatar-container">
+          <img [src]="getAvatarUrl(contact)" alt="Avatar" class="avatar">
+          <span class="status-indicator" [ngClass]="getUserStatus(contact).toLowerCase()"></span>
+        </div>
+
+        <div matListItemTitle class="contact-name">
+          {{ contact.fullName || contact.username }}
+        </div>
+
+        <div matListItemLine class="contact-info" *ngIf="contact.bio">
+          {{ contact.bio }}
+        </div>
+
+        <div matListItemMeta class="contact-meta">
+          <span class="status-text">{{ getUserStatus(contact) | titlecase }}</span>
+        </div>
+      </a>
+    </mat-nav-list>
+  </div>
+</div>

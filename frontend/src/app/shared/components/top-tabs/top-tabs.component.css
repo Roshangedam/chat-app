@@ -1,0 +1,68 @@
+.top-tabs-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Profile Header */
+.profile-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: #f8f9fa;
+}
+
+.avatar-container {
+  margin-right: 12px;
+}
+
+.profile-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.app-title {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+/* Tabs */
+.mat-tab-group {
+  min-height: 48px;
+}
+
+.tab-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 4px 0;
+}
+
+.tab-text {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.badge {
+  position: absolute;
+  top: -4px;
+  right: -12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background-color: #f44336;
+  color: white;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 0 4px;
+}

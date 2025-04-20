@@ -1,0 +1,42 @@
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidenav-container {
+  flex: 1;
+  height: 100%;
+}
+
+.sidenav {
+  width: 350px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+mat-sidenav-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mobile-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mobile-list-view {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Media Queries for Responsive Design */
+@media (max-width: 768px) {
+  .sidenav {
+    width: 100%;
+  }
+}

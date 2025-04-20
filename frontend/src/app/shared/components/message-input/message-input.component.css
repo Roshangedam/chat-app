@@ -1,0 +1,31 @@
+.message-input-container {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  background-color: #fff;
+}
+
+.input-wrapper {
+  flex: 1;
+  margin: 0 8px;
+  background-color: #f5f5f5;
+  border-radius: 24px;
+  padding: 8px 16px;
+}
+
+.message-textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  background-color: transparent;
+  resize: none;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+button[disabled] {
+  opacity: 0.5;
+}

@@ -1,0 +1,66 @@
+<div class="chat-room-container">
+  <!-- Chat Header -->
+  <div class="chat-header">
+    <div class="back-button" (click)="goBack()">
+      <mat-icon>arrow_back</mat-icon>
+    </div>
+
+    <div class="conversation-info">
+      <h2 class="conversation-name">{{ getConversationName() }}</h2>
+      <div class="participant-status" *ngIf="conversation && !conversation.groupChat">
+        <span class="status-indicator" [ngClass]="getParticipantStatus().toLowerCase()"></span>
+        <span class="status-text">{{ getParticipantStatus() | titlecase }}</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button mat-icon-button [matMenuTriggerFor]="menu">
+        <mat-icon>more_vert</mat-icon>
+      </button>
+      <mat-menu #menu="matMenu">
+        <button mat-menu-item>
+          <mat-icon>search</mat-icon>
+          <span>Search</span>
+        </button>
+        <button mat-menu-item *ngIf="conversation?.groupChat">
+          <mat-icon>group</mat-icon>
+          <span>View participants</span>
+        </button>
+        <button mat-menu-item>
+          <mat-icon>notifications_off</mat-icon>
+          <span>Mute notifications</span>
+        </button>
+      </mat-menu>
+    </div>
+  </div>
+
+  <!-- Chat Body -->
+  <div class="chat-body" #messageContainer>
+    <!-- Loading Indicator -->
+    <div *ngIf="isLoading" class="loading-container">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Messages -->
+    <div class="messages-container">
+      <app-chat-message
+        *ngFor="let message of messages"
+        [message]="message"
+        [isOwnMessage]="message.senderId === currentUser?.id">
+      </app-chat-message>
+    </div>
+
+    <!-- Typing Indicator -->
+    <div *ngIf="isTyping" class="typing-indicator">
+      <span>{{ typingUser }} is typing...</span>
+    </div>
+  </div>
+
+  <!-- Chat Footer -->
+  <div class="chat-footer">
+    <app-message-input
+      (messageSent)="onSendMessage($event)"
+      (typing)="onTyping()">
+    </app-message-input>
+  </div>
+</div>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200px" height="200px" viewBox="0 0 200 200" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g transform="translate(20, 20)">
+            <!-- Left Chat Bubble -->
+            <g transform="translate(0, 30)">
+                <rect fill="#E3F2FD" x="0" y="0" width="70" height="40" rx="10"></rect>
+                <rect fill="#E3F2FD" x="0" y="0" width="10" height="10" transform="translate(0, 40)"></rect>
+            </g>
+            
+            <!-- Right Chat Bubble -->
+            <g transform="translate(90, 80)">
+                <rect fill="#BBDEFB" x="0" y="0" width="70" height="40" rx="10"></rect>
+                <rect fill="#BBDEFB" x="60" y="0" width="10" height="10" transform="translate(0, 40)"></rect>
+            </g>
+            
+            <!-- Top Chat Bubble -->
+            <g transform="translate(50, 0)">
+                <rect fill="#E1F5FE" x="0" y="0" width="60" height="30" rx="10"></rect>
+                <rect fill="#E1F5FE" x="25" y="0" width="10" height="10" transform="translate(0, 30)"></rect>
+            </g>
+            
+            <!-- Circle Elements -->
+            <circle fill="#2196F3" cx="30" cy="100" r="10"></circle>
+            <circle fill="#1976D2" cx="130" cy="50" r="8"></circle>
+            <circle fill="#64B5F6" cx="80" cy="130" r="12"></circle>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,24 @@
+<div class="message-input-container">
+  <button mat-icon-button matTooltip="Attach files">
+    <mat-icon>attach_file</mat-icon>
+  </button>
+  
+  <div class="input-wrapper">
+    <textarea 
+      #messageInput
+      [(ngModel)]="message"
+      (keydown)="onKeyPress($event)"
+      placeholder="Type a message..."
+      class="message-textarea"
+      rows="1"></textarea>
+  </div>
+  
+  <button 
+    mat-icon-button 
+    color="primary"
+    [disabled]="!message.trim()"
+    (click)="onSendMessage()"
+    matTooltip="Send message">
+    <mat-icon>send</mat-icon>
+  </button>
+</div>
