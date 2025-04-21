@@ -47,7 +47,7 @@ export interface Conversation {
  * Legacy Chat Service
  * This is a compatibility layer to support the old chat service API
  * while transitioning to the new standardized chat service.
- * 
+ *
  * @deprecated Use the new ChatService from api/services instead
  */
 @Injectable({
@@ -55,12 +55,12 @@ export interface Conversation {
 })
 export class ChatService {
   private baseUrl = `${environment.apiUrl}`;
-  
+
   // Observable sources
   private messagesSubject = new BehaviorSubject<Message[]>([]);
   private conversationsSubject = new BehaviorSubject<Conversation[]>([]);
   private activeConversationSubject = new BehaviorSubject<Conversation | null>(null);
-  
+
   // Observable streams
   public messages$ = this.messagesSubject.asObservable();
   public conversations$ = this.conversationsSubject.asObservable();
@@ -77,13 +77,13 @@ export class ChatService {
       const oldConversations = newConversations.map(this.convertToOldConversation);
       this.conversationsSubject.next(oldConversations);
     });
-    
+
     this.newChatService.messages$.subscribe(newMessages => {
       // Convert new model to old model
       const oldMessages = newMessages.map(this.convertToOldMessage);
       this.messagesSubject.next(oldMessages);
     });
-    
+
     this.newChatService.activeConversation$.subscribe(newConversation => {
       if (newConversation) {
         // Convert new model to old model
@@ -159,7 +159,7 @@ export class ChatService {
    */
   setActiveConversation(conversation: Conversation | null): void {
     this.activeConversationSubject.next(conversation);
-    
+
     // Also update the new chat service
     if (conversation) {
       this.newChatService.getConversation(conversation.id).subscribe(newConversation => {
@@ -187,10 +187,14 @@ export class ChatService {
     this.newChatService.getConversation(conversationId).subscribe(conversation => {
       this.newChatService.setActiveConversation(conversation);
     });
-    
+
     // Load messages using the new chat service
     return this.newChatService.loadMessages().pipe(
-      map(messages => messages.map(this.convertToOldMessage))
+      map(messages => {
+        // Ensure messages is an array
+        const messageArray = Array.isArray(messages) ? messages : [];
+        return messageArray.map(this.convertToOldMessage);
+      })
     );
   }
 

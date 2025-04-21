@@ -2,6 +2,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 16px;
+  padding-bottom: 70px; /* Add padding to prevent overlap with input */
   background-color: #f5f5f5;
 }
 
@@ -93,6 +94,8 @@
   background-color: #9e9e9e;
   margin-right: 4px;
   animation: bounce 1.5s infinite;
+  /* Optimize animation performance */
+  will-change: transform;
 }
 
 .dot:nth-child(2) {
@@ -114,7 +117,7 @@
     transform: translateY(0);
   }
   30% {
-    transform: translateY(-4px);
+    transform: translateY(-3px);
   }
 }
 

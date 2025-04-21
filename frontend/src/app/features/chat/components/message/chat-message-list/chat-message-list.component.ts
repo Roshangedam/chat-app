@@ -30,6 +30,9 @@ export class ChatMessageListComponent implements OnInit, OnChanges {
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
+  // Cache message groups to avoid recalculating on every render
+  private cachedMessageGroups: { date: Date, messages: ChatMessage[] }[] = [];
+
   constructor() {}
 
   ngOnInit(): void {}
@@ -37,7 +40,10 @@ export class ChatMessageListComponent implements OnInit, OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     // Scroll to bottom when messages change
     if (changes['messages']) {
-      setTimeout(() => this.scrollToBottom(), 100);
+      // Cache message groups to avoid recalculating on every render
+      this.cachedMessageGroups = this.calculateMessageGroups();
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => this.scrollToBottom());
     }
   }
 
@@ -47,7 +53,19 @@ export class ChatMessageListComponent implements OnInit, OnChanges {
   scrollToBottom(): void {
     try {
       const element = this.scrollContainer.nativeElement;
-      element.scrollTop = element.scrollHeight;
+      // Use smooth scrolling for better UX
+      element.scrollTo({
+        top: element.scrollHeight,
+        behavior: 'smooth'
+      });
+
+      // Double-check scroll position after a short delay
+      // This ensures scrolling works even with dynamic content
+      setTimeout(() => {
+        if (element.scrollTop + element.clientHeight < element.scrollHeight - 50) {
+          element.scrollTop = element.scrollHeight;
+        }
+      }, 100);
     } catch (err) {
       console.error('Error scrolling to bottom:', err);
     }
@@ -77,7 +95,7 @@ export class ChatMessageListComponent implements OnInit, OnChanges {
   isDifferentDay(prev: ChatMessage, current: ChatMessage): boolean {
     const prevDate = this.getMessageDate(prev);
     const currDate = this.getMessageDate(current);
-    
+
     return prevDate.toDateString() !== currDate.toDateString();
   }
 
@@ -91,7 +109,7 @@ export class ChatMessageListComponent implements OnInit, OnChanges {
     if (index === 0) {
       return true;
     }
-    
+
     // Show avatar if the sender changed
     const prevMessage = this.messages[index - 1];
     return prevMessage.senderId !== message.senderId;
@@ -101,23 +119,51 @@ export class ChatMessageListComponent implements OnInit, OnChanges {
    * Group messages by date
    */
   getMessageGroups(): { date: Date, messages: ChatMessage[] }[] {
+    // Return cached groups if available
+    if (this.cachedMessageGroups.length > 0) {
+      return this.cachedMessageGroups;
+    }
+
+    // Calculate groups if cache is empty
+    return this.calculateMessageGroups();
+  }
+
+  /**
+   * Calculate message groups by date
+   * This is separated to allow caching
+   */
+  private calculateMessageGroups(): { date: Date, messages: ChatMessage[] }[] {
     const groups: { date: Date, messages: ChatMessage[] }[] = [];
-    
+
     this.messages.forEach(message => {
       const messageDate = this.getMessageDate(message);
       const dateString = messageDate.toDateString();
-      
+
       // Find existing group or create new one
       let group = groups.find(g => g.date.toDateString() === dateString);
-      
+
       if (!group) {
         group = { date: messageDate, messages: [] };
         groups.push(group);
       }
-      
+
       group.messages.push(message);
     });
-    
+
     return groups;
+  }
+
+  /**
+   * Track message groups by date string to improve rendering performance
+   */
+  trackByDate(index: number, group: { date: Date, messages: ChatMessage[] }): string {
+    return group.date.toDateString();
+  }
+
+  /**
+   * Track messages by ID to improve rendering performance
+   */
+  trackByMessage(index: number, message: ChatMessage): string | number {
+    return message.id || index;
   }
 }

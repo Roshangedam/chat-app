@@ -109,8 +109,16 @@ export class ChatWebsocketService implements OnDestroy {
     // Subscribe to the conversation topic
     const subscription = this.stompClient.subscribe(destination, (message: IMessage) => {
       try {
-        const chatMessage = JSON.parse(message.body) as ChatMessage;
-        this.messageReceivedSubject.next(chatMessage);
+        if (message && message.body) {
+          const chatMessage = JSON.parse(message.body) as ChatMessage;
+          if (chatMessage) {
+            this.messageReceivedSubject.next(chatMessage);
+          } else {
+            console.warn('Received empty or invalid chat message');
+          }
+        } else {
+          console.warn('Received empty message from WebSocket');
+        }
       } catch (error) {
         console.error('Error parsing message:', error);
       }
@@ -142,12 +150,20 @@ export class ChatWebsocketService implements OnDestroy {
     // Subscribe to the typing topic
     const subscription = this.stompClient.subscribe(destination, (message: IMessage) => {
       try {
-        const typingData = JSON.parse(message.body);
-        this.typingStatusSubject.next({
-          conversationId: conversationId,
-          username: typingData.username,
-          isTyping: typingData.isTyping
-        });
+        if (message && message.body) {
+          const typingData = JSON.parse(message.body);
+          if (typingData && typingData.username !== undefined && typingData.isTyping !== undefined) {
+            this.typingStatusSubject.next({
+              conversationId: conversationId,
+              username: typingData.username,
+              isTyping: typingData.isTyping
+            });
+          } else {
+            console.warn('Received invalid typing indicator data');
+          }
+        } else {
+          console.warn('Received empty typing indicator message');
+        }
       } catch (error) {
         console.error('Error parsing typing indicator:', error);
       }

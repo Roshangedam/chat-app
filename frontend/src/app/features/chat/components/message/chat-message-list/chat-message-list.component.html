@@ -12,14 +12,14 @@
     </div>
 
     <!-- Message groups by date -->
-    <ng-container *ngFor="let group of getMessageGroups()">
+    <ng-container *ngFor="let group of getMessageGroups(); trackBy: trackByDate">
       <!-- Date divider -->
       <div class="date-divider">
         {{ group.date | date:'mediumDate' }}
       </div>
 
       <!-- Messages for this date -->
-      <ng-container *ngFor="let message of group.messages; let i = index">
+      <ng-container *ngFor="let message of group.messages; let i = index; trackBy: trackByMessage">
         <chat-message-item
           [message]="message"
           [isOwnMessage]="isOwnMessage(message)"

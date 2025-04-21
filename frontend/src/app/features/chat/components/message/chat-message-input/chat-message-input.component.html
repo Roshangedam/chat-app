@@ -1,10 +1,10 @@
-<div class="message-input-container">
+<div class="message-input-container" #inputContainer>
   <form [formGroup]="messageForm" (ngSubmit)="onSubmit()" class="message-form">
     <mat-form-field appearance="outline" class="message-field">
-      <input 
-        matInput 
-        formControlName="message" 
-        placeholder="Type a message" 
+      <input
+        matInput
+        formControlName="message"
+        placeholder="Type a message"
         [disabled]="disabled"
         (keyup)="onTyping()"
         (keypress)="onKeyPress($event)"
@@ -13,19 +13,19 @@
         Message cannot be empty
       </mat-error>
     </mat-form-field>
-    
-    <button 
-      mat-icon-button 
-      type="button" 
+
+    <button
+      mat-icon-button
+      type="button"
       class="attachment-button"
       [disabled]="disabled">
       <mat-icon>attach_file</mat-icon>
     </button>
-    
-    <button 
-      mat-fab 
-      color="primary" 
-      type="submit" 
+
+    <button
+      mat-fab
+      color="primary"
+      type="submit"
       class="send-button"
       [disabled]="messageForm.invalid || disabled">
       <mat-icon>send</mat-icon>

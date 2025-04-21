@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -28,6 +28,7 @@ export class ChatMessageInputComponent implements OnInit {
   @Input() disabled = false;
   @Output() messageSent = new EventEmitter<string>();
   @Output() typing = new EventEmitter<void>();
+  @ViewChild('inputContainer') inputContainer!: ElementRef;
 
   messageForm: FormGroup;
   private typingTimeout: any;
@@ -52,6 +53,14 @@ export class ChatMessageInputComponent implements OnInit {
     if (message) {
       this.messageSent.emit(message);
       this.messageForm.reset({ message: '' });
+
+      // Focus the input field after sending a message
+      setTimeout(() => {
+        const inputElement = this.inputContainer.nativeElement.querySelector('input');
+        if (inputElement) {
+          inputElement.focus();
+        }
+      }, 0);
     }
   }
 

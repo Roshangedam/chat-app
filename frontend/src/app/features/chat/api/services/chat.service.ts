@@ -1,6 +1,6 @@
 import { Injectable, OnDestroy } from '@angular/core';
-import { BehaviorSubject, Observable, Subscription, of, throwError } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
+import { BehaviorSubject, Observable, Subscription, of, throwError, asyncScheduler } from 'rxjs';
+import { catchError, tap, throttleTime } from 'rxjs/operators';
 import { ChatApiService } from './chat-api.service';
 import { ChatWebsocketService } from '../websocket/chat-websocket.service';
 import { ChatMessage, ChatConversation } from '../models';
@@ -53,13 +53,27 @@ export class ChatService implements OnDestroy {
    * Subscribe to WebSocket events
    */
   private subscribeToWebSocketEvents(): void {
-    // Subscribe to new messages
-    const messageSub = this.websocketService.messageReceived$.subscribe(message => {
+    // Subscribe to new messages with throttling to prevent UI flickering
+    const messageSub = this.websocketService.messageReceived$.pipe(
+      // Throttle message processing to prevent UI flickering
+      throttleTime(100, asyncScheduler, { leading: true, trailing: true })
+    ).subscribe((message: ChatMessage) => {
       // Add the new message to the messages array if it's for the active conversation
       const activeConversation = this.activeConversationSubject.value;
       if (activeConversation && message.conversationId === activeConversation.id) {
         const currentMessages = this.messagesSubject.value;
-        this.messagesSubject.next([...currentMessages, message]);
+
+        // Check if this message already exists to prevent duplicates
+        const messageExists = currentMessages.some(m =>
+          m.id === message.id ||
+          (m.content === message.content &&
+           m.senderId === message.senderId &&
+           Math.abs(new Date(m.sentAt || 0).getTime() - new Date(message.sentAt || 0).getTime()) < 5000)
+        );
+
+        if (!messageExists) {
+          this.messagesSubject.next([...currentMessages, message]);
+        }
       }
 
       // Update the conversations list with the new message preview
@@ -212,13 +226,16 @@ export class ChatService implements OnDestroy {
 
     return this.apiService.getMessageHistory(activeConversation.id, page, size).pipe(
       tap(messages => {
+        // Ensure messages is an array
+        const messageArray = Array.isArray(messages) ? messages : [];
+
         // If it's the first page, replace all messages
         // Otherwise, prepend the new messages to the existing ones
         if (page === 0) {
-          this.messagesSubject.next(messages);
+          this.messagesSubject.next(messageArray);
         } else {
           const currentMessages = this.messagesSubject.value;
-          this.messagesSubject.next([...messages, ...currentMessages]);
+          this.messagesSubject.next([...messageArray, ...currentMessages]);
         }
 
         this.loadingSubject.next(false);

@@ -65,6 +65,7 @@
   border-radius: 8px;
   margin: 0;
   overflow: hidden;
+  position: relative;
 }
 
 /* Responsive Adjustments */

@@ -1,7 +1,9 @@
 .message-item {
   display: flex;
   margin-bottom: 8px;
-  animation: fadeIn 0.3s ease-in-out;
+  /* Reduce animation intensity to prevent flickering */
+  animation: fadeIn 0.2s ease-out;
+  will-change: opacity;
 }
 
 .own-message {
@@ -90,8 +92,8 @@
 
 @keyframes fadeIn {
   from {
-    opacity: 0;
-    transform: translateY(10px);
+    opacity: 0.7;
+    transform: translateY(5px);
   }
   to {
     opacity: 1;

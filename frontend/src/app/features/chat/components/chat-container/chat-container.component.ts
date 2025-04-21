@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
 import { ChatService } from '../../api/services/chat.service';
 import { ChatMessage, ChatConversation } from '../../api/models';
 import { ChatHeaderComponent } from '../conversation/chat-header/chat-header.component';
@@ -46,7 +47,10 @@ export class ChatContainerComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     // Subscribe to messages
-    const messagesSub = this.chatService.messages$.subscribe(messages => {
+    const messagesSub = this.chatService.messages$.pipe(
+      // Debounce to prevent rapid UI updates
+      debounceTime(50)
+    ).subscribe(messages => {
       this.messages = messages;
     });
 
