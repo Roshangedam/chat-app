@@ -133,7 +133,7 @@
         <!-- Main Content Area -->
         <div class="main-content">
           <!-- Feature Toolbar - Will be used for future features like calls -->
-          <div class="chat-header" *ngIf="activeConversation">
+          <!-- <div class="chat-header" *ngIf="activeConversation">
             <div class="chat-info">
               <img [src]="getConversationAvatar(activeConversation)" alt="Chat" class="chat-avatar">
               <div class="chat-details">
@@ -155,10 +155,10 @@
                 <mat-icon>more_vert</mat-icon>
               </button>
             </div>
-          </div>
+          </div> -->
 
           <!-- Main Screen (Chat Room) -->
-          <app-main-screen
+          <app-main-screen style="height: 100%;"
             [conversation]="activeConversation"
             (backClicked)="onBackClicked()">
           </app-main-screen>
