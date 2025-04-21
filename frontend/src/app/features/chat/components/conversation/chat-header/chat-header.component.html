@@ -1,0 +1,33 @@
+<div class="chat-header">
+  <div class="back-button" (click)="onBackClick()">
+    <mat-icon>arrow_back</mat-icon>
+  </div>
+
+  <div class="conversation-info">
+    <h2 class="conversation-name">{{ getConversationName() }}</h2>
+    <div class="status-text" *ngIf="getStatusText()">
+      <span class="status-indicator" [ngClass]="getStatusClass()"></span>
+      <span>{{ getStatusText() }}</span>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <button mat-icon-button [matMenuTriggerFor]="menu">
+      <mat-icon>more_vert</mat-icon>
+    </button>
+    <mat-menu #menu="matMenu">
+      <button mat-menu-item (click)="onMenuAction('search')">
+        <mat-icon>search</mat-icon>
+        <span>Search</span>
+      </button>
+      <button mat-menu-item *ngIf="conversation?.groupChat" (click)="onMenuAction('participants')">
+        <mat-icon>group</mat-icon>
+        <span>View participants</span>
+      </button>
+      <button mat-menu-item (click)="onMenuAction('mute')">
+        <mat-icon>notifications_off</mat-icon>
+        <span>Mute notifications</span>
+      </button>
+    </mat-menu>
+  </div>
+</div>

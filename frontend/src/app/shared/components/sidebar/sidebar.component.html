@@ -1,4 +1,4 @@
-<div class="sidebar-container">
+<div class="sidebar-container" [class.compact-mode]="compactMode">
   <!-- Profile Section -->
   <div class="profile-section">
     <div class="avatar-container">
@@ -6,11 +6,13 @@
         [src]="currentUser?.avatarUrl || 'assets/images/default-avatar.png'"
         alt="Profile Picture"
         class="profile-avatar"
+        [matTooltip]="compactMode ? (currentUser?.fullName || currentUser?.username || 'Guest User') : ''"
+        [matTooltipPosition]="'right'"
       >
       <span class="status-indicator" [ngClass]="currentUser?.status?.toLowerCase() || 'offline'"></span>
     </div>
 
-    <div class="profile-info">
+    <div class="profile-info" *ngIf="!compactMode">
       <h3 class="profile-name">{{ currentUser?.fullName || currentUser?.username || 'Guest User' }}</h3>
       <p class="profile-status">{{ currentUser?.status || 'OFFLINE' | titlecase }}</p>
     </div>
@@ -39,9 +41,11 @@
       <a mat-list-item
          *ngFor="let section of sections"
          (click)="onSectionClick(section.id)"
-         [class.active]="activeSection === section.id">
+         [class.active]="activeSection === section.id"
+         [matTooltip]="compactMode ? section.label : ''"
+         [matTooltipPosition]="'right'">
         <mat-icon matListItemIcon>{{ section.icon }}</mat-icon>
-        <span matListItemTitle>{{ section.label }}</span>
+        <span matListItemTitle *ngIf="!compactMode">{{ section.label }}</span>
         <span matListItemMeta *ngIf="section.id === 'chats'" class="badge-container">
           <span class="badge" *ngIf="section.id === 'chats'">5</span>
         </span>

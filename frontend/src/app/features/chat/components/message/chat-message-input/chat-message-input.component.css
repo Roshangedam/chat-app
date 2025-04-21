@@ -1,0 +1,46 @@
+.message-input-container {
+  background-color: #fff;
+  border-top: 1px solid #e0e0e0;
+  padding: 12px;
+  z-index: 10;
+}
+
+.message-form {
+  display: flex;
+  align-items: center;
+}
+
+.message-field {
+  flex: 1;
+  margin-right: 8px;
+}
+
+::ng-deep .message-field .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+
+::ng-deep .message-field .mat-mdc-text-field-wrapper {
+  background-color: #f5f5f5;
+  border-radius: 24px;
+}
+
+::ng-deep .message-field .mat-mdc-form-field-flex {
+  padding: 0 12px;
+}
+
+.attachment-button {
+  margin-right: 8px;
+}
+
+.send-button {
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+}
+
+.send-button .mat-icon {
+  font-size: 20px;
+  line-height: 20px;
+  height: 20px;
+  width: 20px;
+}

@@ -14,8 +14,9 @@ import { Subscription } from 'rxjs';
 import { ChatService } from '../../../features/chat/services/chat.service';
 import { AuthService } from '../../../core/auth/services/auth.service';
 import { DateFormatterUtils } from '../../utils/date-formatter.utils';
-import { Conversation } from '../../../features/chat/models/conversation.model';
 import { User } from '../../../core/auth/services/auth.service';
+// Import the new chat service for future migration
+import { ChatService as NewChatService } from '../../../features/chat/api/services/chat.service';
 
 @Component({
   selector: 'app-list-view',
@@ -37,9 +38,9 @@ import { User } from '../../../core/auth/services/auth.service';
 })
 export class ListViewComponent implements OnInit, OnDestroy {
   @Input() activeSection: string = 'chats';
-  @Output() conversationSelected = new EventEmitter<Conversation>();
+  @Output() conversationSelected = new EventEmitter<any>();
 
-  conversations: Conversation[] = [];
+  conversations: any[] = [];
   contacts: User[] = [];
   searchQuery: string = '';
   private subscriptions: Subscription = new Subscription();
@@ -54,13 +55,9 @@ export class ListViewComponent implements OnInit, OnDestroy {
     // Subscribe to conversations
     this.subscriptions.add(
       this.chatService.conversations$.subscribe(conversations => {
-        // Convert the conversation type if needed
-        this.conversations = conversations.map(conv => {
-          return {
-            ...conv,
-            id: String(conv.id) // Convert number to string
-          } as Conversation;
-        });
+        // Just store the conversations as they are
+        // The conversion will happen in the dashboard component
+        this.conversations = conversations;
       })
     );
 
@@ -102,20 +99,16 @@ export class ListViewComponent implements OnInit, OnDestroy {
     ];
   }
 
-  onConversationClick(conversation: Conversation): void {
+  onConversationClick(conversation: any): void {
     this.conversationSelected.emit(conversation);
   }
 
   onContactClick(contact: User): void {
     // Create a one-to-one conversation with this contact
     this.chatService.createOneToOneConversation(contact.id).subscribe(conversation => {
-      // Convert the conversation type if needed
-      const convertedConversation = {
-        ...conversation,
-        id: String(conversation.id) // Convert number to string
-      } as Conversation;
-
-      this.conversationSelected.emit(convertedConversation);
+      // Just emit the conversation as is
+      // The conversion will happen in the dashboard component
+      this.conversationSelected.emit(conversation);
     });
   }
 
@@ -157,7 +150,7 @@ export class ListViewComponent implements OnInit, OnDestroy {
     });
   }
 
-  getConversationName(conversation: Conversation): string {
+  getConversationName(conversation: any): string {
     if (conversation.groupChat) {
       return conversation.name;
     }
@@ -166,11 +159,11 @@ export class ListViewComponent implements OnInit, OnDestroy {
     const currentUser = this.authService.getCurrentUser();
     if (!currentUser) return conversation.name;
 
-    const otherParticipant = conversation.participants.find(p => p.id !== currentUser.id);
+    const otherParticipant = conversation.participants.find((p: any) => p.id !== currentUser.id);
     return otherParticipant ? (otherParticipant.fullName || otherParticipant.username) : conversation.name;
   }
 
-  getAvatarUrl(item: Conversation | User): string {
+  getAvatarUrl(item: any): string {
     if ('avatarUrl' in item) {
       return item.avatarUrl || 'assets/images/default-avatar.png';
     } else {

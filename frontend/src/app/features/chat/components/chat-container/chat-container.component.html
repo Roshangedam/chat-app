@@ -1,0 +1,25 @@
+<div class="chat-container">
+  <!-- Chat Header -->
+  <chat-header
+    [conversation]="conversation"
+    [isTyping]="isTyping"
+    [typingUser]="typingUser"
+    (backClick)="onBackClick()">
+  </chat-header>
+
+  <!-- Message List -->
+  <chat-message-list
+    [messages]="messages"
+    [loading]="isLoading"
+    [isTyping]="isTyping"
+    [typingUser]="typingUser"
+    [userId]="userId">
+  </chat-message-list>
+
+  <!-- Message Input -->
+  <chat-message-input
+    [disabled]="isSending || !conversation"
+    (messageSent)="onSendMessage($event)"
+    (typing)="onTyping()">
+  </chat-message-input>
+</div>

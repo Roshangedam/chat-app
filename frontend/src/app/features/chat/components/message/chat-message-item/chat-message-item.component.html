@@ -1,0 +1,27 @@
+<div class="message-item" [ngClass]="{'own-message': isOwnMessage, 'other-message': !isOwnMessage}">
+  <!-- Avatar (only show for other users and when sender changes) -->
+  <div class="avatar" *ngIf="!isOwnMessage && showAvatar">
+    <img [src]="getAvatarUrl()" alt="Avatar">
+  </div>
+  <div class="avatar-placeholder" *ngIf="!isOwnMessage && !showAvatar"></div>
+
+  <div class="message-content">
+    <!-- Sender name (only show for other users and when sender changes) -->
+    <div class="sender-name" *ngIf="!isOwnMessage && showAvatar">
+      {{ getSenderName() }}
+    </div>
+
+    <!-- Message bubble -->
+    <div class="message-bubble">
+      <p>{{ message.content }}</p>
+      <div class="message-time">
+        {{ getMessageDate() | date:'shortTime' }}
+        <span class="message-status" *ngIf="isOwnMessage">
+          <mat-icon *ngIf="message.status === 'SENT'" class="status-icon">done</mat-icon>
+          <mat-icon *ngIf="message.status === 'DELIVERED'" class="status-icon">done_all</mat-icon>
+          <mat-icon *ngIf="message.status === 'READ'" class="status-icon read">done_all</mat-icon>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>

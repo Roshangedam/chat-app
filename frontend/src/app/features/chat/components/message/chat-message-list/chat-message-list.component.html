@@ -1,0 +1,46 @@
+<div class="message-list-container" #scrollContainer>
+  <div class="messages-wrapper">
+    <!-- Loading spinner -->
+    <div class="loading-spinner" *ngIf="loading">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+
+    <!-- No messages placeholder -->
+    <div class="no-messages" *ngIf="!loading && messages.length === 0">
+      <p>No messages yet</p>
+      <p class="hint">Send a message to start the conversation</p>
+    </div>
+
+    <!-- Message groups by date -->
+    <ng-container *ngFor="let group of getMessageGroups()">
+      <!-- Date divider -->
+      <div class="date-divider">
+        {{ group.date | date:'mediumDate' }}
+      </div>
+
+      <!-- Messages for this date -->
+      <ng-container *ngFor="let message of group.messages; let i = index">
+        <chat-message-item
+          [message]="message"
+          [isOwnMessage]="isOwnMessage(message)"
+          [showAvatar]="shouldShowAvatar(i, message)">
+        </chat-message-item>
+      </ng-container>
+    </ng-container>
+
+    <!-- Typing indicator -->
+    <div class="typing-indicator" *ngIf="isTyping">
+      <div class="avatar" *ngIf="typingUser">
+        <div class="avatar-placeholder"></div>
+      </div>
+      <div class="typing-bubble">
+        <span class="typing-dots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </span>
+        <div class="typing-text">{{ typingUser }} is typing...</div>
+      </div>
+    </div>
+  </div>
+</div>

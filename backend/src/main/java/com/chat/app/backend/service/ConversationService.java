@@ -1,20 +1,21 @@
 package com.chat.app.backend.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.chat.app.backend.dto.ConversationDTO;
 import com.chat.app.backend.dto.UserDTO;
 import com.chat.app.backend.model.Conversation;
 import com.chat.app.backend.model.User;
 import com.chat.app.backend.repository.ConversationRepository;
 import com.chat.app.backend.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Service for conversation operations.
@@ -59,6 +60,33 @@ public class ConversationService {
         }
 
         return convertToDTO(conversationOpt.get());
+    }
+
+    /**
+     * Get a conversation by ID and verify the user has access to it.
+     *
+     * @param conversationId the conversation ID
+     * @param userId the user ID requesting access
+     * @return the conversation DTO
+     * @throws RuntimeException if the conversation is not found or the user doesn't have access
+     */
+    public ConversationDTO getConversation(Long conversationId, Long userId) {
+        Optional<Conversation> conversationOpt = conversationRepository.findById(conversationId);
+        if (conversationOpt.isEmpty()) {
+            throw new RuntimeException("Conversation not found");
+        }
+
+        Conversation conversation = conversationOpt.get();
+
+        // Check if the user is a participant in this conversation
+        boolean isParticipant = conversation.getParticipants().stream()
+                .anyMatch(participant -> participant.getId().equals(userId));
+
+        if (!isParticipant) {
+            throw new RuntimeException("User does not have access to this conversation");
+        }
+
+        return convertToDTO(conversation);
     }
 
     /**
@@ -290,5 +318,139 @@ public class ConversationService {
         dto.setStatus(user.getStatus());
         dto.setLastActive(user.getLastActive());
         return dto;
+    }
+
+    /**
+     * Add multiple participants to a conversation.
+     *
+     * @param conversationId the conversation ID
+     * @param requesterId the ID of the user making the request
+     * @param participantIds the IDs of the participants to add
+     * @return the updated conversation DTO
+     */
+    @Transactional
+    public ConversationDTO addParticipantsToConversation(Long conversationId, Long requesterId, Set<Long> participantIds) {
+        // Verify the conversation exists and the requester has access
+        ConversationDTO conversationDTO = getConversation(conversationId, requesterId);
+
+        if (!conversationDTO.isGroupChat()) {
+            throw new RuntimeException("Cannot add participants to a one-to-one conversation");
+        }
+
+        // Add each participant
+        for (Long participantId : participantIds) {
+            try {
+                addUserToConversation(conversationId, participantId);
+            } catch (Exception e) {
+                // Log the error but continue with other participants
+                System.err.println("Failed to add participant " + participantId + ": " + e.getMessage());
+            }
+        }
+
+        // Get the updated conversation
+        return getConversationById(conversationId);
+    }
+
+    /**
+     * Remove a participant from a conversation.
+     *
+     * @param conversationId the conversation ID
+     * @param requesterId the ID of the user making the request
+     * @param participantId the ID of the participant to remove
+     * @return the updated conversation DTO
+     */
+    @Transactional
+    public ConversationDTO removeParticipantFromConversation(Long conversationId, Long requesterId, Long participantId) {
+        // Verify the conversation exists and the requester has access
+        ConversationDTO conversationDTO = getConversation(conversationId, requesterId);
+
+        if (!conversationDTO.isGroupChat()) {
+            throw new RuntimeException("Cannot remove participants from a one-to-one conversation");
+        }
+
+        // Check if the requester is the creator or removing themselves
+        boolean isCreator = conversationDTO.getCreatorId().equals(requesterId);
+        boolean isSelfRemoval = requesterId.equals(participantId);
+
+        if (!isCreator && !isSelfRemoval) {
+            throw new RuntimeException("Only the conversation creator can remove other participants");
+        }
+
+        // Remove the participant
+        return removeUserFromConversation(conversationId, participantId);
+    }
+
+    /**
+     * Update a conversation's details.
+     *
+     * @param conversationId the conversation ID
+     * @param requesterId the ID of the user making the request
+     * @param name the new name (optional)
+     * @param description the new description (optional)
+     * @param avatarUrl the new avatar URL (optional)
+     * @return the updated conversation DTO
+     */
+    @Transactional
+    public ConversationDTO updateConversation(Long conversationId, Long requesterId,
+                                             String name, String description, String avatarUrl) {
+        // Verify the conversation exists and the requester has access
+        ConversationDTO conversationDTO = getConversation(conversationId, requesterId);
+
+        // Check if the requester is the creator
+        if (!conversationDTO.getCreatorId().equals(requesterId)) {
+            throw new RuntimeException("Only the conversation creator can update the conversation details");
+        }
+
+        Optional<Conversation> conversationOpt = conversationRepository.findById(conversationId);
+        Conversation conversation = conversationOpt.get(); // Safe because we already checked in getConversation
+
+        // Update the fields if provided
+        if (name != null && !name.trim().isEmpty()) {
+            conversation.setName(name);
+        }
+
+        if (description != null) {
+            conversation.setDescription(description);
+        }
+
+        if (avatarUrl != null) {
+            conversation.setAvatarUrl(avatarUrl);
+        }
+
+        conversation.setUpdatedAt(LocalDateTime.now());
+
+        Conversation savedConversation = conversationRepository.save(conversation);
+
+        return convertToDTO(savedConversation);
+    }
+
+    /**
+     * Search for conversations by name that the user has access to.
+     *
+     * @param query the search query
+     * @param userId the ID of the user making the request
+     * @return a list of matching conversation DTOs
+     */
+    public List<ConversationDTO> searchConversations(String query, Long userId) {
+        if (query == null || query.trim().isEmpty()) {
+            return getConversationsForUser(userId);
+        }
+
+        // Get all conversations the user has access to
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            throw new RuntimeException("User not found");
+        }
+
+        User user = userOpt.get();
+
+        // Find conversations by name containing the query
+        List<Conversation> matchingConversations = conversationRepository.findByNameContainingIgnoreCase(query);
+
+        // Filter to only include conversations the user is a participant in
+        return matchingConversations.stream()
+                .filter(conversation -> conversation.getParticipants().contains(user))
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 }

@@ -1,4 +1,4 @@
-import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
+import { Injectable, Inject, PLATFORM_ID, Injector } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { catchError, map, tap, finalize } from 'rxjs/operators';
@@ -46,7 +46,8 @@ export class AuthService {
     private http: HttpClient,
     private router: Router,
     @Inject(PLATFORM_ID) private platformId: Object,
-    private loggingService: LoggingService
+    private loggingService: LoggingService,
+    private injector: Injector
   ) {
     this.isBrowser = isPlatformBrowser(this.platformId);
     this.initAuthFromStorage();
@@ -105,6 +106,11 @@ export class AuthService {
           // Log success after handling authentication to ensure we have the user object
           const username = this.currentUserSubject.value?.username || 'Unknown';
           this.loggingService.logInfo(`User logged in successfully: ${username}`);
+
+          // Initialize chat service after successful login
+          if (storedToken) {
+            this.initializeChatServices(storedToken);
+          }
         }),
         catchError(error => {
           this.loggingService.logError('Login failed', error);
@@ -128,6 +134,12 @@ export class AuthService {
         tap(response => {
           // this.loggingService.logInfo(`OAuth2 authentication successful for user: ${response.user.username}`);
           this.handleAuthentication(response);
+
+          // Initialize chat service after successful OAuth login
+          const token = localStorage.getItem('token');
+          if (token) {
+            this.initializeChatServices(token);
+          }
         }),
         catchError(error => {
           this.loggingService.logError('OAuth callback error', error);
@@ -145,6 +157,12 @@ export class AuthService {
         tap(response => {
           // this.loggingService.logInfo(`OAuth2 token verification successful for user: ${response.user.username}`);
           this.handleAuthentication(response);
+
+          // Initialize chat service after successful OAuth token verification
+          const token = localStorage.getItem('token');
+          if (token) {
+            this.initializeChatServices(token);
+          }
         }),
         catchError(error => {
           this.loggingService.logError('Token verification error', error);
@@ -161,6 +179,12 @@ export class AuthService {
         tap(response => {
           this.loggingService.logInfo(`User registered successfully: ${userData.username}`);
           this.handleAuthentication(response);
+
+          // Initialize chat service after successful registration
+          const token = localStorage.getItem('token');
+          if (token) {
+            this.initializeChatServices(token);
+          }
         }),
         catchError(error => {
           this.loggingService.logError(`Registration failed for user: ${userData.username}`, error);
@@ -430,5 +454,35 @@ export class AuthService {
         this.logout();
       }, expirationDuration);
     }
+  }
+
+  /**
+   * Initialize chat services using lazy loading to avoid circular dependencies
+   */
+  private initializeChatServices(token: string): void {
+    // Use setTimeout to break the circular dependency chain
+    setTimeout(() => {
+      try {
+        // Dynamically import the services to avoid circular dependencies
+        import('../../../features/chat/api/services/chat.service').then(module => {
+          const ChatService = module.ChatService;
+          const chatService = this.injector.get(ChatService);
+          if (chatService && typeof chatService.initialize === 'function') {
+            chatService.initialize(token);
+            chatService.loadConversations().subscribe();
+          }
+        });
+
+        import('../../../features/chat/api/services/user.service').then(module => {
+          const UserService = module.UserService;
+          const userService = this.injector.get(UserService);
+          if (userService && typeof userService.loadUsers === 'function') {
+            userService.loadUsers().subscribe();
+          }
+        });
+      } catch (error) {
+        this.loggingService.logError('Error initializing chat services', error);
+      }
+    }, 0);
   }
 }

@@ -1,0 +1,67 @@
+<div class="user-list-container">
+  <!-- Search Bar -->
+  <div class="search-container">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search Users</mat-label>
+      <input
+        matInput
+        [(ngModel)]="searchQuery"
+        (keyup.enter)="searchUsers()"
+        placeholder="Enter username">
+      <button
+        *ngIf="searchQuery"
+        matSuffix
+        mat-icon-button
+        aria-label="Clear"
+        (click)="clearSearch()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <button
+        matSuffix
+        mat-icon-button
+        aria-label="Search"
+        (click)="searchUsers()">
+        <mat-icon>search</mat-icon>
+      </button>
+    </mat-form-field>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div class="loading-container" *ngIf="isLoading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <!-- Error Message -->
+  <div class="error-container" *ngIf="error">
+    <p class="error-message">{{ error }}</p>
+    <button mat-button color="primary" (click)="loadUsers()">Retry</button>
+  </div>
+
+  <!-- No Users Message -->
+  <div class="no-users-container" *ngIf="!isLoading && !error && filteredUsers.length === 0">
+    <p class="no-users-message">No users found</p>
+    <button mat-button color="primary" (click)="loadUsers()">Refresh</button>
+  </div>
+
+  <!-- User List -->
+  <mat-list *ngIf="!isLoading && !error && filteredUsers.length > 0">
+    <div class="user-item" *ngFor="let user of filteredUsers">
+      <mat-list-item (click)="onStartChat(user)">
+        <div class="user-avatar">
+          <img
+            [src]="user.avatarUrl || 'assets/images/user-avatar.png'"
+            alt="{{ user.username }}'s avatar">
+          <span class="status-indicator" [ngClass]="getStatusClass(user.status)"></span>
+        </div>
+        <div class="user-info">
+          <h3 class="user-name">{{ user.fullName || user.username }}</h3>
+          <p class="user-username">{{'@' + user.username }}</p>
+        </div>
+        <button mat-icon-button class="chat-button">
+          <mat-icon>chat</mat-icon>
+        </button>
+      </mat-list-item>
+      <mat-divider></mat-divider>
+    </div>
+  </mat-list>
+</div>

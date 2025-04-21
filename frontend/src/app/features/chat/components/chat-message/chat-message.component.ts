@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { Message } from '../../models/message.model';
-import { DateFormatterUtils } from '../../utils/date-formatter.utils';
+import { DateFormatterUtils } from '../../../../shared/utils/date-formatter.utils';
 
 @Component({
   selector: 'app-chat-message',
@@ -25,7 +25,7 @@ export class ChatMessageComponent {
 
   getMessageStatusIcon(): string {
     if (!this.message.status || !this.isOwnMessage) return '';
-    
+
     switch (this.message.status) {
       case 'SENT':
         return 'check';

@@ -11,8 +11,8 @@ import { Router } from '@angular/router';
 import { ChatMessageComponent } from '../chat-message/chat-message.component';
 import { MessageInputComponent } from '../message-input/message-input.component';
 import { ChatService } from '../../services/chat.service';
-import { AuthService } from '../../services/auth.service';
-import { ResponsiveUtils } from '../../utils/responsive.utils';
+import { AuthService } from '../../../../core/auth/services/auth.service';
+import { ResponsiveUtils } from '../../../../shared/utils/responsive.utils';
 import { Conversation } from '../../models/conversation.model';
 import { Message } from '../../models/message.model';
 import { User } from '../../models/user.model';
@@ -36,7 +36,7 @@ import { User } from '../../models/user.model';
 export class ChatRoomComponent implements OnInit, OnDestroy, AfterViewChecked {
   @Input() conversation: Conversation | null = null;
   @ViewChild('messageContainer') messageContainer!: ElementRef;
-  
+
   messages: Message[] = [];
   currentUser: User | null = null;
   isLoading: boolean = false;
@@ -109,9 +109,9 @@ export class ChatRoomComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   onTyping(): void {
     if (!this.conversation) return;
-    
+
     this.chatService.sendTypingIndicator(this.conversation.id, true);
-    
+
     // Stop typing indicator after 3 seconds of inactivity
     setTimeout(() => {
       this.chatService.sendTypingIndicator(this.conversation.id, false);
@@ -120,21 +120,21 @@ export class ChatRoomComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   getConversationName(): string {
     if (!this.conversation) return '';
-    
+
     if (this.conversation.groupChat) {
       return this.conversation.name;
     }
-    
+
     // For one-to-one chats, show the other participant's name
     if (!this.currentUser) return this.conversation.name;
-    
+
     const otherParticipant = this.conversation.participants.find(p => p.id !== this.currentUser?.id);
     return otherParticipant ? (otherParticipant.fullName || otherParticipant.username) : this.conversation.name;
   }
 
   getParticipantStatus(): string {
     if (!this.conversation || this.conversation.groupChat || !this.currentUser) return 'OFFLINE';
-    
+
     const otherParticipant = this.conversation.participants.find(p => p.id !== this.currentUser?.id);
     return otherParticipant?.status || 'OFFLINE';
   }
@@ -142,7 +142,7 @@ export class ChatRoomComponent implements OnInit, OnDestroy, AfterViewChecked {
   goBack(): void {
     // Clear active conversation
     this.chatService.setActiveConversation(null);
-    
+
     // For mobile, navigate back to the list view
     if (this.responsiveUtils.isHandset$) {
       this.router.navigate(['/']);

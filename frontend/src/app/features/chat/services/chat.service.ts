@@ -1,14 +1,18 @@
 import { Injectable } from '@angular/core';
+import { Observable, BehaviorSubject, of } from 'rxjs';
+import { map, tap, catchError } from 'rxjs/operators';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, throwError } from 'rxjs';
-import { map, tap, catchError, filter } from 'rxjs/operators';
-
-import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
-// Fix for SockJS import
-import SockJS from 'sockjs-client';
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../../../core/auth/services/auth.service';
 
+// Import the new chat service and models
+import { ChatService as NewChatService } from '../api/services/chat.service';
+import { ChatMessage, ChatConversation, ChatUser } from '../api/models';
+
+/**
+ * Legacy interface for Message
+ * @deprecated Use ChatMessage from api/models instead
+ */
 export interface Message {
   id?: number;
   senderId: number;
@@ -22,8 +26,12 @@ export interface Message {
   status?: string;
 }
 
+/**
+ * Legacy interface for Conversation
+ * @deprecated Use ChatConversation from api/models instead
+ */
 export interface Conversation {
-  id: number;
+  id: string | number;
   name: string;
   description?: string;
   avatarUrl?: string;
@@ -35,525 +43,196 @@ export interface Conversation {
   updatedAt?: Date;
 }
 
+/**
+ * Legacy Chat Service
+ * This is a compatibility layer to support the old chat service API
+ * while transitioning to the new standardized chat service.
+ * 
+ * @deprecated Use the new ChatService from api/services instead
+ */
 @Injectable({
   providedIn: 'root'
 })
 export class ChatService {
   private baseUrl = `${environment.apiUrl}`;
-  // Fix for stompClient initialization
-  private stompClient!: Client;
-  private subscriptions: Map<string, StompSubscription> = new Map();
-
+  
   // Observable sources
   private messagesSubject = new BehaviorSubject<Message[]>([]);
   private conversationsSubject = new BehaviorSubject<Conversation[]>([]);
-  private connectionStatusSubject = new BehaviorSubject<boolean>(false);
-
+  private activeConversationSubject = new BehaviorSubject<Conversation | null>(null);
+  
   // Observable streams
   public messages$ = this.messagesSubject.asObservable();
   public conversations$ = this.conversationsSubject.asObservable();
-  public connectionStatus$ = this.connectionStatusSubject.asObservable();
+  public activeConversation$ = this.activeConversationSubject.asObservable();
 
-  constructor(private http: HttpClient, private authService: AuthService) {
-    // Don't automatically initialize connection at startup
-    // Instead wait for authentication state to be established
-
-    // Handle authentication status changes
-    this.authService.isAuthenticated$.pipe(
-      filter(isAuthenticated => isAuthenticated === true) // Only react to becoming authenticated
-    ).subscribe(() => {
-      // When authenticated, initialize connection if not connected
-      if (!this.connectionStatusSubject.value) {
-        this.initializeWebSocketConnection();
-      }
+  constructor(
+    private http: HttpClient,
+    private authService: AuthService,
+    private newChatService: NewChatService
+  ) {
+    // Subscribe to the new chat service to keep our data in sync
+    this.newChatService.conversations$.subscribe(newConversations => {
+      // Convert new model to old model
+      const oldConversations = newConversations.map(this.convertToOldConversation);
+      this.conversationsSubject.next(oldConversations);
     });
-
-    // Handle logout more explicitly
-    this.authService.isAuthenticated$.pipe(
-      filter(isAuthenticated => isAuthenticated === false) // React to becoming unauthenticated
-    ).subscribe(() => {
-      // When logged out, ensure connection is closed
-      this.disconnect();
+    
+    this.newChatService.messages$.subscribe(newMessages => {
+      // Convert new model to old model
+      const oldMessages = newMessages.map(this.convertToOldMessage);
+      this.messagesSubject.next(oldMessages);
     });
-
-    // Listen for token changes to reinitialize the WebSocket connection with the new token
-    this.authService.currentUser$.subscribe(() => {
-      // This will be triggered after a token refresh since the auth service updates the current user
-      if (this.authService.isAuthenticated()) {
-        console.log('User data updated, reinitializing WebSocket connection with new token');
-        // First disconnect to ensure clean reconnection with new token
-        this.disconnect();
-        // Longer delay to ensure token refresh completes and disconnect finishes before reconnecting
-        setTimeout(() => {
-          this.initializeWebSocketConnection();
-          console.log('WebSocket connection reinitialized with new token');
-        }, 2000); // Increased from 1000ms to 2000ms to ensure token is fully refreshed and connection is established
-      }
-    });
-  }
-
-  // Initialize WebSocket connection
-  private initializeWebSocketConnection(): void {
-    try {
-      // Get the token directly from AuthService instead of localStorage
-      const token = this.authService.getToken();
-
-      // Don't initialize if no token is available
-      if (!token) {
-        console.warn('No authentication token available for WebSocket connection');
-        return;
-      }
-
-      // Close existing connection if any
-      this.disconnect();
-
-      // Log that we're initializing with a valid token
-      console.log('Initializing WebSocket connection with valid token');
-      console.log('Opening Web Socket...');
-
-      // Store the token at the time of connection initialization
-      // This helps detect if the token changes during connection setup
-      const connectionToken = token;
-
-      this.stompClient = new Client({
-        webSocketFactory: () => new SockJS(environment.wsUrl),
-        debug: (str) => console.debug(str),
-        reconnectDelay: 5000,
-        heartbeatIncoming: 4000,
-        heartbeatOutgoing: 4000,
-        // Add connect headers with token for authentication
-        connectHeaders: {
-          Authorization: `Bearer ${connectionToken}`
-        },
-        // Add a beforeConnect callback to ensure we always use the latest token
-        beforeConnect: () => {
-          // Get the latest token right before connecting
-          const latestToken = this.authService.getToken();
-          if (latestToken && latestToken !== connectionToken) {
-            console.log('Token changed before connection, using latest token');
-            this.stompClient.connectHeaders = {
-              Authorization: `Bearer ${latestToken}`
-            };
-          }
-        }
-      });
-
-      this.stompClient.onConnect = (frame) => {
-        console.log('Connected to WebSocket: ' + frame);
-        this.connectionStatusSubject.next(true);
-
-        // Check if token has changed during connection process
-        const currentToken = this.authService.getToken();
-        if (currentToken && currentToken !== connectionToken) {
-          console.log('Token changed during connection, reconnecting with new token');
-          // Disconnect and reconnect with new token
-          this.disconnect();
-          setTimeout(() => {
-            this.initializeWebSocketConnection();
-          }, 500);
-          return;
-        }
-
-        // Re-subscribe to active conversations after reconnection
-        // This ensures subscriptions are restored after token refresh
-        this.resubscribeToActiveConversations();
-      };
-
-      this.stompClient.onStompError = (frame) => {
-        console.error('WebSocket error: ' + frame.headers['message']);
-        console.error('Additional details: ' + frame.body);
-        this.connectionStatusSubject.next(false);
-
-        // Check if error is related to authentication
-        if (frame.headers['message']?.includes('Unauthorized') ||
-            frame.body?.includes('Unauthorized') ||
-            frame.headers['message']?.includes('401')) {
-          // Handle authentication error
-          console.error('WebSocket authentication failed. Checking for token refresh');
-
-          // Implement a more robust token refresh detection mechanism
-          let retryCount = 0;
-          const maxRetries = 3;
-          const checkForNewToken = () => {
-            retryCount++;
-            const newToken = this.authService.getToken();
-
-            if (newToken && newToken !== connectionToken) {
-              console.log('New token detected after error, attempting to reconnect');
-              // Use a small delay to ensure token is fully processed
-              setTimeout(() => this.initializeWebSocketConnection(), 300);
-            } else if (this.authService.isAuthenticated() && retryCount < maxRetries) {
-              console.log(`Still authenticated but no new token, waiting longer (attempt ${retryCount}/${maxRetries})`);
-              // Exponential backoff for retries
-              setTimeout(checkForNewToken, 1000 * retryCount);
-            } else if (!this.authService.isAuthenticated()) {
-              console.log('No longer authenticated, not attempting to reconnect WebSocket');
-            } else {
-              console.log('Max retries reached, giving up on WebSocket reconnection');
-            }
-          };
-
-          // Start the token refresh detection process
-          setTimeout(checkForNewToken, 1000);
-        }
-      };
-
-      this.stompClient.onWebSocketError = (event) => {
-        console.error('WebSocket connection error:', event);
-        this.connectionStatusSubject.next(false);
-
-        // Check if we're still authenticated and try to reconnect after a delay
-        if (this.authService.isAuthenticated()) {
-          console.log('WebSocket error while authenticated, will try to reconnect');
-          setTimeout(() => this.ensureConnection(), 3000);
-        }
-      };
-
-      this.stompClient.onWebSocketClose = () => {
-        console.log('WebSocket connection closed');
-        this.connectionStatusSubject.next(false);
-      };
-
-      this.stompClient.activate();
-    } catch (error) {
-      console.error('Failed to initialize WebSocket connection:', error);
-      this.connectionStatusSubject.next(false);
-    }
-  }
-
-  // Re-subscribe to active conversations after reconnection
-  private resubscribeToActiveConversations(): void {
-    // Get list of conversation IDs that we were subscribed to
-    const activeTopics = Array.from(this.subscriptions.keys());
-
-    // Clear the subscriptions map since the old subscriptions are invalid
-    this.subscriptions.clear();
-
-    // Re-subscribe to each topic
-    activeTopics.forEach(topic => {
-      const conversationId = parseInt(topic.split('.')[1]);
-      if (!isNaN(conversationId)) {
-        this.subscribeToConversation(conversationId);
-      }
-    });
-  }
-
-  // Disconnect WebSocket connection
-  private disconnect(): void {
-    if (this.stompClient && this.stompClient.connected) {
-      try {
-        // Unsubscribe from all topics
-        this.subscriptions.forEach(subscription => subscription.unsubscribe());
-        this.subscriptions.clear();
-
-        // Disconnect the client
-        this.stompClient.deactivate();
-        console.log('WebSocket connection closed');
-      } catch (error) {
-        console.error('Error disconnecting WebSocket:', error);
-      }
-    }
-    this.connectionStatusSubject.next(false);
-  }
-
-
-  // Subscribe to a conversation's messages
-  subscribeToConversation(conversationId: number): void {
-    if (!this.stompClient || !this.stompClient.connected) {
-      console.warn('WebSocket not connected. Will retry when connected.');
-      // Store conversation ID to subscribe when connection is established
-      return;
-    }
-
-    const destination = `/topic/conversation.${conversationId}`;
-    if (!this.subscriptions.has(destination)) {
-      const subscription = this.stompClient.subscribe(destination, (message: IMessage) => {
-        try {
-          const receivedMessage: Message = JSON.parse(message.body);
-          const currentMessages = this.messagesSubject.value;
-
-          // Add message if it doesn't exist already
-          if (!currentMessages.some(m => m.id === receivedMessage.id)) {
-            this.messagesSubject.next([...currentMessages, receivedMessage]);
-          }
-        } catch (error) {
-          console.error('Error processing received message:', error);
-        }
-      });
-
-      this.subscriptions.set(destination, subscription);
-    }
-  }
-
-  // Unsubscribe from a conversation
-  unsubscribeFromConversation(conversationId: number): void {
-    const destination = `/topic/conversation.${conversationId}`;
-    const subscription = this.subscriptions.get(destination);
-
-    if (subscription) {
-      subscription.unsubscribe();
-      this.subscriptions.delete(destination);
-    }
-  }
-
-  // Send a message to a conversation
-  sendMessage(conversationId: number, content: string): Observable<Message> {
-    if (this.stompClient && this.stompClient.connected) {
-      // Send via WebSocket for real-time delivery
-      const message: Message = {
-        senderId: 0, // Will be set by the server based on authentication
-        conversationId: conversationId,
-        content: content
-      };
-
-      this.stompClient.publish({
-        destination: '/app/chat.send',
-        body: JSON.stringify(message)
-      });
-    }
-
-    // Also send via REST API for persistence
-    return this.http.post<Message>(`${this.baseUrl}/api/v1/messages/conversation/${conversationId}`, {
-      content: content
-    }).pipe(
-      catchError(error => {
-        console.error('Error sending message:', error);
-        return throwError(() => error);
-      })
-    );
-  }
-
-  // Mark messages as read in a conversation
-  markMessagesAsRead(conversationId: number): Observable<number> {
-    if (this.stompClient && this.stompClient.connected) {
-      // Send read status via WebSocket
-      const message: Message = {
-        senderId: 0, // Will be set by the server
-        conversationId: conversationId,
-        content: ''
-      };
-
-      this.stompClient.publish({
-        destination: '/app/chat.read',
-        body: JSON.stringify(message)
-      });
-    }
-
-    // Also update via REST API
-    return this.http.put<number>(`${this.baseUrl}/api/v1/messages/conversation/${conversationId}/read`, {})
-      .pipe(
-        catchError(error => {
-          console.error('Error marking messages as read:', error);
-          return throwError(() => error);
-        })
-      );
-  }
-
-  // Get message history for a conversation
-  getMessageHistory(conversationId: number, page: number = 0, size: number = 20): Observable<Message[]> {
-    return this.http.get<any>(`${this.baseUrl}/api/v1/messages/conversation/${conversationId}?page=${page}&size=${size}`)
-      .pipe(
-        map(response => response.content),
-        tap(messages => {
-          const currentMessages = this.messagesSubject.value;
-          const uniqueMessages = [...currentMessages];
-
-          // Add only messages that don't exist in the current list
-          messages.forEach((message: Message) => {
-            if (!uniqueMessages.some(m => m.id === message.id)) {
-              uniqueMessages.push(message);
-            }
-          });
-
-          this.messagesSubject.next(uniqueMessages);
-        }),
-        catchError(error => {
-          console.error(`Error loading message history for conversation ${conversationId}:`, error);
-          return throwError(() => error);
-        })
-      );
-  }
-
-  // Get all conversations for the current user
-  getConversations(): Observable<Conversation[]> {
-    // Get a fresh token before making the request
-    const token = this.authService.getToken();
-
-    // If we're not authenticated or don't have a token, wait briefly to see if a token refresh is in progress
-    if (!token && this.authService.isAuthenticated()) {
-      console.log('No token available but authenticated, waiting for potential token refresh');
-      return new Observable<Conversation[]>(observer => {
-        // Wait for a longer time to allow token refresh to complete
-        setTimeout(() => {
-          const freshToken = this.authService.getToken();
-          if (freshToken) {
-            console.log('Fresh token obtained after waiting, proceeding with request');
-            // First ensure WebSocket connection is established with the new token
-            this.disconnect();
-            this.initializeWebSocketConnection();
-
-            // Wait for WebSocket connection to be established before making API request
-            setTimeout(() => {
-              // Validate token format before making request
-              if (freshToken.split('.').length !== 3) {
-                console.error('Invalid token format detected, token refresh may not be complete');
-                observer.error(new Error('Invalid token format'));
-                return;
-              }
-
-              // Retry the request with the new token
-              this.http.get<Conversation[]>(`${this.baseUrl}/api/v1/conversations`)
-                .pipe(
-                  tap(conversations => this.conversationsSubject.next(conversations))
-                ).subscribe({
-                  next: (conversations) => observer.next(conversations),
-                  error: (err) => observer.error(err),
-                  complete: () => observer.complete()
-                });
-            }, 1500); // Wait 1.5 seconds for WebSocket connection to establish
-          } else {
-            console.error('No token available after waiting, cannot proceed with request');
-            observer.error(new Error('Authentication token not available'));
-          }
-        }, 2000); // Increased wait time to 2 seconds for token refresh
-      });
-    }
-
-    return this.http.get<Conversation[]>(`${this.baseUrl}/api/v1/conversations`)
-      .pipe(
-        tap(conversations => this.conversationsSubject.next(conversations)),
-        catchError(error => {
-          console.error('Error loading conversations:', error);
-
-          // Handle unauthorized error specifically
-          if (error.status === 401) {
-            // Don't call logout here to avoid circular dependency
-            // Instead, wait for token refresh to complete
-            if (this.authService.isAuthenticated()) {
-              console.log('Received 401 while authenticated, waiting for token refresh to complete');
-
-              // Wait longer to ensure token refresh completes
-              // This prevents the race condition where we try to reconnect before the token is refreshed
-              return new Observable<Conversation[]>(observer => {
-                setTimeout(() => {
-                  console.log('Attempting to reconnect after waiting for token refresh');
-                  // Get a fresh token after waiting
-                  const freshToken = this.authService.getToken();
-                  if (freshToken) {
-                    console.log('Fresh token obtained, reconnecting WebSocket');
-                    this.disconnect();
-                    this.initializeWebSocketConnection();
-
-                    // Increased delay to ensure WebSocket connection is fully established
-                    setTimeout(() => {
-                      console.log('WebSocket connection should be established, retrying API request');
-                      this.http.get<Conversation[]>(`${this.baseUrl}/api/v1/conversations`)
-                        .pipe(
-                          tap(conversations => this.conversationsSubject.next(conversations))
-                        ).subscribe({
-                          next: (conversations) => observer.next(conversations),
-                          error: (err) => {
-                            console.error('Still failed to load conversations after token refresh:', err);
-                            observer.error(err);
-                          },
-                          complete: () => observer.complete()
-                        });
-                    }, 2000); // Increased delay to 2 seconds after reconnecting WebSocket
-                  } else {
-                    observer.error(error); // Propagate original error if no fresh token
-                  }
-                }, 3000); // Increased wait time to 3 seconds for token refresh to complete
-              });
-            }
-          }
-
-          return throwError(() => error);
-        })
-      );
-  }
-
-  // Get a specific conversation by ID
-  getConversation(conversationId: number): Observable<Conversation> {
-    return this.http.get<Conversation>(`${this.baseUrl}/api/v1/conversations/${conversationId}`)
-      .pipe(
-        catchError(error => {
-          console.error(`Error loading conversation ${conversationId}:`, error);
-          return throwError(() => error);
-        })
-      );
-  }
-
-  // Create a new one-to-one conversation
-  createOneToOneConversation(participantId: number): Observable<Conversation> {
-    return this.http.post<Conversation>(`${this.baseUrl}/api/v1/conversations/one-to-one`, { participantId })
-      .pipe(
-        tap(conversation => {
-          const currentConversations = this.conversationsSubject.value;
-          this.conversationsSubject.next([...currentConversations, conversation]);
-        }),
-        catchError(error => {
-          console.error('Error creating one-to-one conversation:', error);
-          return throwError(() => error);
-        })
-      );
-  }
-
-  // Create a new group conversation
-  createGroupConversation(name: string, description: string, participantIds: number[]): Observable<Conversation> {
-    return this.http.post<Conversation>(`${this.baseUrl}/api/v1/conversations/group`, {
-      name,
-      description,
-      participantIds
-    }).pipe(
-      tap(conversation => {
-        const currentConversations = this.conversationsSubject.value;
-        this.conversationsSubject.next([...currentConversations, conversation]);
-      }),
-      catchError(error => {
-        console.error('Error creating group conversation:', error);
-        return throwError(() => error);
-      })
-    );
-  }
-
-  // Get unread message count for a conversation
-  getUnreadMessageCount(conversationId: number): Observable<number> {
-    return this.http.get<number>(`${this.baseUrl}/api/v1/messages/conversation/${conversationId}/unread/count`)
-      .pipe(
-        catchError(error => {
-          console.error(`Error getting unread count for conversation ${conversationId}:`, error);
-          return throwError(() => error);
-        })
-      );
-  }
-
-  // Public method to disconnect WebSocket when service is destroyed
-  // This can also be called from components when needed
-  public disconnectWebSocket(): void {
-    this.disconnect();
-  }
-
-  // Check connection status and reconnect if needed
-  public ensureConnection(): void {
-    if (!this.connectionStatusSubject.value && this.authService.isAuthenticated()) {
-      // Get a fresh token before reconnecting
-      const token = this.authService.getToken();
-      if (token) {
-        console.log('Ensuring WebSocket connection with valid token');
-        this.initializeWebSocketConnection();
+    
+    this.newChatService.activeConversation$.subscribe(newConversation => {
+      if (newConversation) {
+        // Convert new model to old model
+        const oldConversation = this.convertToOldConversation(newConversation);
+        this.activeConversationSubject.next(oldConversation);
       } else {
-        console.log('No valid token available, waiting for potential token refresh');
-        // Wait briefly to see if a token refresh is in progress
-        setTimeout(() => {
-          const freshToken = this.authService.getToken();
-          if (freshToken) {
-            console.log('Fresh token obtained after waiting, initializing WebSocket connection');
-            this.initializeWebSocketConnection();
-          } else {
-            console.log('No token available after waiting, cannot establish WebSocket connection');
-          }
-        }, 2500); // Wait 2.5 seconds for token refresh
+        this.activeConversationSubject.next(null);
       }
+    });
+  }
+
+  /**
+   * Convert new ChatConversation model to old Conversation model
+   */
+  private convertToOldConversation(newConversation: ChatConversation): Conversation {
+    return {
+      id: newConversation.id,
+      name: newConversation.name,
+      description: newConversation.description,
+      avatarUrl: newConversation.avatarUrl,
+      groupChat: newConversation.groupChat,
+      creatorId: Number(newConversation.creatorId),
+      creatorUsername: newConversation.creatorUsername,
+      participants: newConversation.participants || [],
+      createdAt: newConversation.createdAt,
+      updatedAt: newConversation.updatedAt
+    };
+  }
+
+  /**
+   * Convert new ChatMessage model to old Message model
+   */
+  private convertToOldMessage(newMessage: ChatMessage): Message {
+    return {
+      id: Number(newMessage.id),
+      senderId: Number(newMessage.senderId),
+      senderUsername: newMessage.senderUsername,
+      senderAvatarUrl: newMessage.senderAvatarUrl,
+      conversationId: Number(newMessage.conversationId),
+      content: newMessage.content,
+      sentAt: newMessage.sentAt,
+      deliveredAt: newMessage.deliveredAt,
+      readAt: newMessage.readAt,
+      status: newMessage.status
+    };
+  }
+
+  /**
+   * Get all conversations
+   * @deprecated Use loadConversations from the new ChatService instead
+   */
+  getConversations(): Observable<Conversation[]> {
+    // Use the new chat service but return the old model format
+    return this.newChatService.loadConversations().pipe(
+      map(conversations => conversations.map(this.convertToOldConversation))
+    );
+  }
+
+  /**
+   * Get a specific conversation
+   * @deprecated Use getConversation from the new ChatService instead
+   */
+  getConversation(conversationId: number): Observable<Conversation> {
+    // Use the new chat service but return the old model format
+    return this.newChatService.getConversation(conversationId).pipe(
+      map(conversation => this.convertToOldConversation(conversation))
+    );
+  }
+
+  /**
+   * Set active conversation
+   * @deprecated Use setActiveConversation from the new ChatService instead
+   */
+  setActiveConversation(conversation: Conversation | null): void {
+    this.activeConversationSubject.next(conversation);
+    
+    // Also update the new chat service
+    if (conversation) {
+      this.newChatService.getConversation(conversation.id).subscribe(newConversation => {
+        this.newChatService.setActiveConversation(newConversation);
+      });
+    } else {
+      this.newChatService.setActiveConversation(null);
     }
+  }
+
+  /**
+   * Get active conversation
+   * @deprecated Use activeConversation$ from the new ChatService instead
+   */
+  getActiveConversation(): Conversation | null {
+    return this.activeConversationSubject.value;
+  }
+
+  /**
+   * Load messages for a conversation
+   * @deprecated Use loadMessages from the new ChatService instead
+   */
+  loadMessages(conversationId: number): Observable<Message[]> {
+    // Set the active conversation in the new chat service
+    this.newChatService.getConversation(conversationId).subscribe(conversation => {
+      this.newChatService.setActiveConversation(conversation);
+    });
+    
+    // Load messages using the new chat service
+    return this.newChatService.loadMessages().pipe(
+      map(messages => messages.map(this.convertToOldMessage))
+    );
+  }
+
+  /**
+   * Send a message
+   * @deprecated Use sendMessage from the new ChatService instead
+   */
+  sendMessage(conversationId: number, content: string): Observable<Message> {
+    // Use the new chat service but return the old model format
+    return this.newChatService.sendMessage(content).pipe(
+      map(message => this.convertToOldMessage(message))
+    );
+  }
+
+  /**
+   * Mark messages as read
+   * @deprecated Use markMessagesAsRead from the new ChatService instead
+   */
+  markMessagesAsRead(conversationId: number): Observable<any> {
+    // Use the new chat service
+    return this.newChatService.markMessagesAsRead(conversationId);
+  }
+
+  /**
+   * Create a one-to-one conversation
+   * @deprecated Use createOneToOneConversation from the new ChatService instead
+   */
+  createOneToOneConversation(userId: number): Observable<Conversation> {
+    // Use the new chat service but return the old model format
+    return this.newChatService.createOneToOneConversation(userId).pipe(
+      map(conversation => this.convertToOldConversation(conversation))
+    );
+  }
+
+  /**
+   * Create a group conversation
+   * @deprecated Use createGroupConversation from the new ChatService instead
+   */
+  createGroupConversation(name: string, description: string, participantIds: number[]): Observable<Conversation> {
+    // Use the new chat service but return the old model format
+    return this.newChatService.createGroupConversation(name, description, participantIds).pipe(
+      map(conversation => this.convertToOldConversation(conversation))
+    );
   }
 }

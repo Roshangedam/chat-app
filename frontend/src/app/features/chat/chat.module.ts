@@ -1,7 +1,8 @@
-import { NgModule } from '@angular/core';
+import { NgModule, ModuleWithProviders } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 
 // Angular Material Imports
 import { MatButtonModule } from '@angular/material/button';
@@ -17,17 +18,31 @@ import { MatBadgeModule } from '@angular/material/badge';
 import { ChatComponent } from './components/chat/chat.component';
 import { MessageListComponent } from './components/message-list/message-list.component';
 import { MessageInputComponent } from './components/message-input/message-input.component';
+import { ChatContainerComponent } from './components/chat-container/chat-container.component';
+import { ChatHeaderComponent } from './components/conversation/chat-header/chat-header.component';
+import { ChatMessageListComponent } from './components/message/chat-message-list/chat-message-list.component';
+import { ChatMessageItemComponent } from './components/message/chat-message-item/chat-message-item.component';
+import { ChatMessageInputComponent } from './components/message/chat-message-input/chat-message-input.component';
+
+// Service Imports
+import { ChatService } from './api/services/chat.service';
+import { ChatApiService } from './api/services/chat-api.service';
+import { ChatWebsocketService } from './api/websocket/chat-websocket.service';
+
+// Configuration Interface
+export interface ChatModuleConfig {
+  apiUrl?: string;
+  wsUrl?: string;
+}
 
 @NgModule({
-  declarations: [
-    ChatComponent,
-    MessageListComponent,
-    MessageInputComponent
-  ],
   imports: [
+    // Angular Modules
     CommonModule,
     ReactiveFormsModule,
     RouterModule,
+
+    // Material Modules
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
@@ -35,12 +50,48 @@ import { MessageInputComponent } from './components/message-input/message-input.
     MatIconModule,
     MatProgressSpinnerModule,
     MatMenuModule,
-    MatBadgeModule
-  ],
-  exports: [
+    MatBadgeModule,
+
+    // Feature Components (standalone)
+    ChatContainerComponent,
+    ChatHeaderComponent,
+    ChatMessageListComponent,
+    ChatMessageItemComponent,
+    ChatMessageInputComponent,
     ChatComponent,
     MessageListComponent,
     MessageInputComponent
+  ],
+  exports: [
+    // All components
+    ChatContainerComponent,
+    ChatHeaderComponent,
+    ChatMessageListComponent,
+    ChatMessageItemComponent,
+    ChatMessageInputComponent,
+    ChatComponent,
+    MessageListComponent,
+    MessageInputComponent
+  ],
+  providers: [
+    // Services
+    ChatService,
+    ChatApiService,
+    ChatWebsocketService
   ]
 })
-export class ChatModule { }
+export class ChatModule {
+  /**
+   * Use this method to configure the chat module with custom settings
+   * @param config Configuration options for the chat module
+   */
+  static forRoot(config: ChatModuleConfig = {}): ModuleWithProviders<ChatModule> {
+    return {
+      ngModule: ChatModule,
+      providers: [
+        { provide: 'CHAT_CONFIG', useValue: config },
+        HttpClient
+      ]
+    };
+  }
+}

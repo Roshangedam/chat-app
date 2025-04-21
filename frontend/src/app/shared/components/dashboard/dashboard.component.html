@@ -1,24 +1,23 @@
 <div class="dashboard-container">
   <!-- Web View with Sidebar -->
   <mat-sidenav-container class="sidenav-container">
-    <mat-sidenav #drawer class="sidenav"
-                 [attr.role]="(responsiveUtils.isHandset$ | async) ? 'dialog' : 'navigation'"
+    <!-- Navigation Sidebar (Icons only on desktop) -->
+    <mat-sidenav #navDrawer class="nav-sidenav"
+                 [attr.role]="'navigation'"
                  [mode]="(responsiveUtils.isHandset$ | async) ? 'over' : 'side'"
                  [opened]="(responsiveUtils.isHandset$ | async) === false">
+      <!-- Sidebar Navigation -->
       <app-sidebar
         [sections]="sections"
         [activeSection]="activeSection"
+        [compactMode]="!(responsiveUtils.isHandset$ | async)"
         (sectionChange)="onSectionChange($event)">
       </app-sidebar>
-
-      <app-list-view
-        [activeSection]="activeSection"
-        (conversationSelected)="onConversationSelected($event)">
-      </app-list-view>
     </mat-sidenav>
 
+    <!-- Content Area with List Sidebar and Main Content -->
     <mat-sidenav-content>
-      <!-- Mobile View with Top Tabs -->
+      <!-- For Mobile: Full Screen Layout -->
       <div *ngIf="responsiveUtils.isHandset$ | async" class="mobile-view">
         <app-top-tabs
           [sections]="sections"
@@ -26,19 +25,115 @@
           (sectionChange)="onSectionChange($event)">
         </app-top-tabs>
 
+        <!-- Show conversation list for chats section -->
         <app-list-view
-          *ngIf="!activeConversation"
+          *ngIf="!activeConversation && activeSection === 'chats'"
           [activeSection]="activeSection"
           (conversationSelected)="onConversationSelected($event)"
           class="mobile-list-view">
         </app-list-view>
+
+        <!-- Show user list for contacts section -->
+        <chat-user-list
+          *ngIf="!activeConversation && activeSection === 'contacts'"
+          (startChat)="onStartChat($event)"
+          class="mobile-list-view">
+        </chat-user-list>
+
+        <!-- Main Screen (Chat Room) for mobile -->
+        <app-main-screen
+          *ngIf="activeConversation"
+          [conversation]="activeConversation"
+          (backClicked)="onBackClicked()">
+        </app-main-screen>
       </div>
 
-      <!-- Main Screen (Chat Room) -->
-      <app-main-screen
-        *ngIf="(!(responsiveUtils.isHandset$ | async) || activeConversation)"
-        [conversation]="activeConversation">
-      </app-main-screen>
+      <!-- For Desktop: WhatsApp-like Layout -->
+      <div *ngIf="!(responsiveUtils.isHandset$ | async)" class="desktop-layout">
+        <!-- List Sidebar -->
+        <div class="list-sidebar">
+          <!-- Header for list sidebar -->
+          <div class="list-header">
+            <div class="user-info">
+              <img [src]="currentUser?.avatarUrl || 'assets/images/default-avatar.png'" alt="Profile" class="user-avatar">
+              <span class="user-name">{{ currentUser?.fullName || currentUser?.username || 'User' }}</span>
+            </div>
+            <div class="header-actions">
+              <button mat-icon-button matTooltip="New Chat">
+                <mat-icon>chat</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="Menu" [matMenuTriggerFor]="optionsMenu">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #optionsMenu="matMenu">
+                <button mat-menu-item routerLink="/auth/profile">
+                  <mat-icon>account_circle</mat-icon>
+                  <span>Profile</span>
+                </button>
+                <button mat-menu-item (click)="logout()">
+                  <mat-icon>exit_to_app</mat-icon>
+                  <span>Logout</span>
+                </button>
+              </mat-menu>
+            </div>
+          </div>
+
+          <!-- Search bar -->
+          <div class="search-container">
+            <mat-form-field appearance="outline" class="search-field">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput placeholder="Search or start new chat" [(ngModel)]="searchQuery">
+            </mat-form-field>
+          </div>
+
+          <!-- Show conversation list for chats section -->
+          <app-list-view
+            *ngIf="activeSection === 'chats'"
+            [activeSection]="activeSection"
+            (conversationSelected)="onConversationSelected($event)">
+          </app-list-view>
+
+          <!-- Show user list for contacts section -->
+          <chat-user-list
+            *ngIf="activeSection === 'contacts'"
+            (startChat)="onStartChat($event)">
+          </chat-user-list>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+          <!-- Feature Toolbar - Will be used for future features like calls -->
+          <div class="chat-header" *ngIf="activeConversation">
+            <div class="chat-info">
+              <img [src]="getConversationAvatar(activeConversation)" alt="Chat" class="chat-avatar">
+              <div class="chat-details">
+                <span class="chat-name">{{ getConversationName(activeConversation) }}</span>
+                <span class="chat-status">{{ getConversationStatus(activeConversation) }}</span>
+              </div>
+            </div>
+            <div class="chat-actions">
+              <button mat-icon-button *ngIf="featureFlags.enableCalls" matTooltip="Start Voice Call" (click)="startVoiceCall()">
+                <mat-icon>call</mat-icon>
+              </button>
+              <button mat-icon-button *ngIf="featureFlags.enableVideoChat" matTooltip="Start Video Call" (click)="startVideoCall()">
+                <mat-icon>videocam</mat-icon>
+              </button>
+              <button mat-icon-button *ngIf="featureFlags.enableScreenSharing" matTooltip="Share Screen" (click)="shareScreen()">
+                <mat-icon>screen_share</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="More Options">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- Main Screen (Chat Room) -->
+          <app-main-screen
+            [conversation]="activeConversation"
+            (backClicked)="onBackClicked()">
+          </app-main-screen>
+        </div>
+      </div>
     </mat-sidenav-content>
   </mat-sidenav-container>
 </div>

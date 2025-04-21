@@ -1,0 +1,157 @@
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
+import { ChatService } from '../../api/services/chat.service';
+import { ChatMessage, ChatConversation } from '../../api/models';
+import { ChatHeaderComponent } from '../conversation/chat-header/chat-header.component';
+import { ChatMessageListComponent } from '../message/chat-message-list/chat-message-list.component';
+import { ChatMessageInputComponent } from '../message/chat-message-input/chat-message-input.component';
+
+/**
+ * Main container component for the chat feature.
+ * This component orchestrates the chat UI and connects to the chat service.
+ */
+@Component({
+  selector: 'chat-container',
+  standalone: true,
+  imports: [
+    CommonModule,
+    ChatHeaderComponent,
+    ChatMessageListComponent,
+    ChatMessageInputComponent
+  ],
+  templateUrl: './chat-container.component.html',
+  styleUrls: ['./chat-container.component.css']
+})
+export class ChatContainerComponent implements OnInit, OnDestroy {
+  @Input() conversationId?: string | number;
+  @Input() userId?: string | number;
+
+  @Output() messageSent = new EventEmitter<ChatMessage>();
+  @Output() conversationChanged = new EventEmitter<ChatConversation>();
+  @Output() backClicked = new EventEmitter<void>();
+
+  conversation: ChatConversation | null = null;
+  messages: ChatMessage[] = [];
+  isLoading = true;
+  isSending = false;
+  isTyping = false;
+  typingUser = '';
+  typingTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  private subscriptions = new Subscription();
+
+  constructor(private chatService: ChatService) {}
+
+  ngOnInit(): void {
+    // Subscribe to messages
+    const messagesSub = this.chatService.messages$.subscribe(messages => {
+      this.messages = messages;
+    });
+
+    // Subscribe to loading state
+    const loadingSub = this.chatService.loading$.subscribe(loading => {
+      this.isLoading = loading;
+    });
+
+    // Subscribe to typing indicators
+    const typingSub = this.chatService.typingUsers$.subscribe(typingUsers => {
+      if (this.conversation) {
+        const typingUsername = typingUsers.get(String(this.conversation.id));
+        this.isTyping = !!typingUsername;
+        this.typingUser = typingUsername || '';
+      } else {
+        this.isTyping = false;
+        this.typingUser = '';
+      }
+    });
+
+    // Add subscriptions to the collection
+    this.subscriptions.add(messagesSub);
+    this.subscriptions.add(loadingSub);
+    this.subscriptions.add(typingSub);
+
+    // Load the conversation if an ID was provided
+    if (this.conversationId) {
+      this.loadConversation(this.conversationId);
+    }
+  }
+
+  /**
+   * Load a conversation by ID
+   * @param conversationId ID of the conversation to load
+   */
+  loadConversation(conversationId: string | number): void {
+    this.chatService.getConversation(conversationId).subscribe({
+      next: (conversation) => {
+        this.conversation = conversation;
+        this.chatService.setActiveConversation(conversation);
+        this.chatService.loadMessages().subscribe();
+        this.conversationChanged.emit(conversation);
+      },
+      error: (error) => {
+        console.error('Error loading conversation:', error);
+      }
+    });
+  }
+
+  /**
+   * Send a message
+   * @param content Content of the message
+   */
+  onSendMessage(content: string): void {
+    if (!content.trim()) return;
+
+    this.isSending = true;
+    this.chatService.sendMessage(content).subscribe({
+      next: (message) => {
+        this.isSending = false;
+        this.messageSent.emit(message);
+      },
+      error: (error) => {
+        this.isSending = false;
+        console.error('Error sending message:', error);
+      }
+    });
+  }
+
+  /**
+   * Handle typing indicator
+   */
+  onTyping(): void {
+    this.chatService.sendTypingIndicator(true);
+
+    // Clear previous timeout
+    if (this.typingTimeout) {
+      clearTimeout(this.typingTimeout);
+    }
+
+    // Set timeout to stop typing indicator after 2 seconds of inactivity
+    this.typingTimeout = setTimeout(() => {
+      this.chatService.sendTypingIndicator(false);
+    }, 2000);
+  }
+
+  /**
+   * Handle back button click
+   */
+  onBackClick(): void {
+    this.backClicked.emit();
+  }
+
+  /**
+   * Clean up resources when the component is destroyed
+   */
+  ngOnDestroy(): void {
+    // Clear the active conversation
+    this.chatService.setActiveConversation(null);
+
+    // Unsubscribe from all subscriptions
+    this.subscriptions.unsubscribe();
+
+    // Clear typing timeout
+    if (this.typingTimeout) {
+      clearTimeout(this.typingTimeout);
+    }
+  }
+}

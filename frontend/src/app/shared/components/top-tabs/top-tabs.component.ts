@@ -6,7 +6,7 @@ import { MatBadgeModule } from '@angular/material/badge';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 
-import { Section } from '../../models/section.model';
+import { Section } from '../../../features/chat/models/section.model';
 import { AuthService } from '../../../core/auth/services/auth.service';
 import { User } from '../../../core/auth/services/auth.service';
 
