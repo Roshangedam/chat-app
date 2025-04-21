@@ -26,6 +26,7 @@ import { ChatMessageInputComponent } from '../message/chat-message-input/chat-me
 export class ChatContainerComponent implements OnInit, OnDestroy {
   @Input() conversationId?: string | number;
   @Input() userId?: string | number;
+  @Input() showHeader: boolean = true;
 
   @Output() messageSent = new EventEmitter<ChatMessage>();
   @Output() conversationChanged = new EventEmitter<ChatConversation>();

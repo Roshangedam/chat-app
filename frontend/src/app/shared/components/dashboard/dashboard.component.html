@@ -5,7 +5,8 @@
     <mat-sidenav #navDrawer class="nav-sidenav"
                  [attr.role]="'navigation'"
                  [mode]="(responsiveUtils.isHandset$ | async) ? 'over' : 'side'"
-                 [opened]="(responsiveUtils.isHandset$ | async) === false">
+                 [opened]="(responsiveUtils.isHandset$ | async) === false"
+                 [disableClose]="!(responsiveUtils.isHandset$ | async)">
       <!-- Sidebar Navigation -->
       <app-sidebar
         [sections]="sections"
@@ -17,9 +18,37 @@
 
     <!-- Content Area with List Sidebar and Main Content -->
     <mat-sidenav-content>
-      <!-- For Mobile: Full Screen Layout -->
-      <div *ngIf="responsiveUtils.isHandset$ | async" class="mobile-view">
+      <!-- For Mobile and Portrait Tablet: Full Screen Layout -->
+      <div *ngIf="(responsiveUtils.isHandset$ | async) || (responsiveUtils.isPortrait$ | async)" class="mobile-view">
+        <!-- Mobile Header with Menu Button -->
+        <div class="mobile-header">
+          <button mat-icon-button (click)="navDrawer.toggle()" *ngIf="!activeConversation">
+            <mat-icon>menu</mat-icon>
+          </button>
+          <button mat-icon-button (click)="onBackClicked()" *ngIf="activeConversation">
+            <mat-icon>arrow_back</mat-icon>
+          </button>
+          <span class="mobile-title">
+            {{ activeConversation ? getConversationName(activeConversation) : 'Chat App' }}
+          </span>
+          <button mat-icon-button [matMenuTriggerFor]="mobileMenu">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #mobileMenu="matMenu">
+            <button mat-menu-item routerLink="/auth/profile">
+              <mat-icon>account_circle</mat-icon>
+              <span>Profile</span>
+            </button>
+            <button mat-menu-item (click)="logout()">
+              <mat-icon>exit_to_app</mat-icon>
+              <span>Logout</span>
+            </button>
+          </mat-menu>
+        </div>
+
+        <!-- Mobile Tabs (only show when not in a conversation) -->
         <app-top-tabs
+          *ngIf="!activeConversation"
           [sections]="sections"
           [activeSection]="activeSection"
           (sectionChange)="onSectionChange($event)">
@@ -44,12 +73,13 @@
         <app-main-screen
           *ngIf="activeConversation"
           [conversation]="activeConversation"
+          [showHeader]="false"
           (backClicked)="onBackClicked()">
         </app-main-screen>
       </div>
 
-      <!-- For Desktop: WhatsApp-like Layout -->
-      <div *ngIf="!(responsiveUtils.isHandset$ | async)" class="desktop-layout">
+      <!-- For Desktop and Landscape Tablet: WhatsApp-like Layout -->
+      <div *ngIf="!(responsiveUtils.isHandset$ | async) && !(responsiveUtils.isPortrait$ | async)" class="desktop-layout">
         <!-- List Sidebar -->
         <div class="list-sidebar">
           <!-- Header for list sidebar -->

@@ -1,6 +1,7 @@
 <div class="chat-container">
   <!-- Chat Header -->
   <chat-header
+    *ngIf="showHeader"
     [conversation]="conversation"
     [isTyping]="isTyping"
     [typingUser]="typingUser"

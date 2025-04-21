@@ -28,6 +28,7 @@ import { ResponsiveUtils } from '../../utils/responsive.utils';
 })
 export class MainScreenComponent implements OnInit, OnDestroy {
   @Input() conversation: any = null;
+  @Input() showHeader: boolean = true;
   @Output() backClicked = new EventEmitter<void>();
 
   userId: string | number | undefined;

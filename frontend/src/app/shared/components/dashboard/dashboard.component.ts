@@ -59,7 +59,7 @@ import { Conversation as ModelConversation } from '../../../features/chat/models
     UserListComponent
   ],
   templateUrl: './dashboard.component.html',
-  styleUrls: ['./dashboard.component.scss']
+  styleUrls: ['./dashboard.component.css']
 })
 export class DashboardComponent implements OnInit, OnDestroy {
 
@@ -111,9 +111,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       }
 
       // Get current user information
-      this.authService.getCurrentUser().subscribe(user => {
-        this.currentUser = user;
-      });
+      this.currentUser = this.authService.getCurrentUser();
 
       // Initialize the new chat service with the auth token
       const token = localStorage.getItem('token');
@@ -378,9 +376,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
    * Log out the current user
    */
   logout(): void {
-    this.authService.logout().subscribe(() => {
-      this.router.navigate(['/auth/login']);
-    });
+    this.authService.logout();
+    // The AuthService.logout() method already handles navigation to login page
   }
 
   /**

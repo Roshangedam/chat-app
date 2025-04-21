@@ -34,10 +34,9 @@ export class ChatWebsocketService implements OnDestroy {
     // Create and configure STOMP client
     this.stompClient = new Client({
       webSocketFactory: () => {
-        // Create SockJS instance with credentials disabled
+        // Create SockJS instance
         const sockjs = new SockJS(`${environment.apiUrl}/ws?token=${token}`);
-        // Disable credentials to avoid CORS issues with wildcard origin
-        sockjs.withCredentials = false;
+        // Note: SockJS handles credentials internally, we don't need to set it manually
         return sockjs;
       },
       connectHeaders: {
