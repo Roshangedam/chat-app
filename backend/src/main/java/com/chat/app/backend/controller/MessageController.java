@@ -30,12 +30,13 @@ public class MessageController {
      * @return a page of message DTOs
      */
     @GetMapping("/conversation/{conversationId}")
-    public ResponseEntity<Page<MessageDTO>> getMessagesForConversation(
+    public ResponseEntity<List<MessageDTO>> getMessagesForConversation(
             @PathVariable Long conversationId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        
-        Page<MessageDTO> messages = messageService.getMessagesForConversation(conversationId, page, size);
+
+        Page<MessageDTO> messagesPage = messageService.getMessagesForConversation(conversationId, page, size);
+        List<MessageDTO> messages = messagesPage.getContent();
         return ResponseEntity.ok(messages);
     }
 
@@ -52,7 +53,7 @@ public class MessageController {
             @PathVariable Long conversationId,
             @RequestBody MessageDTO messageDTO,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        
+
         Long senderId = userDetails.getId();
         MessageDTO sentMessage = messageService.sendMessage(senderId, conversationId, messageDTO.getContent());
         return ResponseEntity.ok(sentMessage);
@@ -69,7 +70,7 @@ public class MessageController {
     public ResponseEntity<Integer> markMessagesAsRead(
             @PathVariable Long conversationId,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        
+
         Long userId = userDetails.getId();
         int messagesRead = messageService.markMessagesAsRead(userId, conversationId);
         return ResponseEntity.ok(messagesRead);
@@ -86,7 +87,7 @@ public class MessageController {
     public ResponseEntity<Long> getUnreadMessageCount(
             @PathVariable Long conversationId,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        
+
         Long userId = userDetails.getId();
         long unreadCount = messageService.getUnreadMessageCount(userId, conversationId);
         return ResponseEntity.ok(unreadCount);
@@ -101,7 +102,7 @@ public class MessageController {
     @GetMapping("/latest")
     public ResponseEntity<List<MessageDTO>> getLatestMessagesForUser(
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        
+
         Long userId = userDetails.getId();
         List<MessageDTO> latestMessages = messageService.getLatestMessagesForUser(userId);
         return ResponseEntity.ok(latestMessages);

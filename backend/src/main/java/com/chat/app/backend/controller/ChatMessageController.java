@@ -4,6 +4,8 @@ import com.chat.app.backend.dto.MessageDTO;
 import com.chat.app.backend.model.MessageStatus;
 import com.chat.app.backend.security.jwt.UserDetailsImpl;
 import com.chat.app.backend.service.MessageService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -19,9 +21,11 @@ import java.time.LocalDateTime;
 @Controller
 public class ChatMessageController {
 
+    private static final Logger logger = LoggerFactory.getLogger(ChatMessageController.class);
+
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
-    
+
     @Autowired
     private MessageService messageService;
 
@@ -33,13 +37,22 @@ public class ChatMessageController {
      */
     @MessageMapping("/chat.send")
     public void sendMessage(@Payload MessageDTO messageDTO, Authentication authentication) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        Long senderId = userDetails.getId();
-        
-        // Use the message service to send the message
-        MessageDTO sentMessage = messageService.sendMessage(senderId, messageDTO.getConversationId(), messageDTO.getContent());
-        
-        // The message service already handles WebSocket and Kafka distribution
+        if (authentication == null) {
+            logger.error("Authentication is null in sendMessage");
+            return;
+        }
+
+        try {
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            Long senderId = userDetails.getId();
+
+            // Use the message service to send the message
+            messageService.sendMessage(senderId, messageDTO.getConversationId(), messageDTO.getContent());
+
+            // The message service already handles WebSocket and Kafka distribution
+        } catch (Exception e) {
+            logger.error("Error in sendMessage: {}", e.getMessage(), e);
+        }
     }
 
     /**
@@ -50,25 +63,34 @@ public class ChatMessageController {
      */
     @MessageMapping("/chat.read")
     public void markMessagesAsRead(@Payload MessageDTO messageDTO, Authentication authentication) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        Long userId = userDetails.getId();
-        
-        // Mark messages as read in the conversation
-        int messagesRead = messageService.markMessagesAsRead(userId, messageDTO.getConversationId());
-        
-        // Notify about read status if any messages were marked as read
-        if (messagesRead > 0) {
-            // Create a status update DTO
-            MessageDTO statusUpdate = new MessageDTO();
-            statusUpdate.setConversationId(messageDTO.getConversationId());
-            statusUpdate.setStatus(MessageStatus.READ);
-            statusUpdate.setReadAt(LocalDateTime.now());
-            
-            // Send to the conversation topic
-            messagingTemplate.convertAndSend(
-                    "/topic/conversation." + messageDTO.getConversationId() + ".status",
-                    statusUpdate
-            );
+        if (authentication == null) {
+            logger.error("Authentication is null in markMessagesAsRead");
+            return;
+        }
+
+        try {
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            Long userId = userDetails.getId();
+
+            // Mark messages as read in the conversation
+            int messagesRead = messageService.markMessagesAsRead(userId, messageDTO.getConversationId());
+
+            // Notify about read status if any messages were marked as read
+            if (messagesRead > 0) {
+                // Create a status update DTO
+                MessageDTO statusUpdate = new MessageDTO();
+                statusUpdate.setConversationId(messageDTO.getConversationId());
+                statusUpdate.setStatus(MessageStatus.READ);
+                statusUpdate.setReadAt(LocalDateTime.now());
+
+                // Send to the conversation topic
+                messagingTemplate.convertAndSend(
+                        "/topic/conversation." + messageDTO.getConversationId() + ".status",
+                        statusUpdate
+                );
+            }
+        } catch (Exception e) {
+            logger.error("Error in markMessagesAsRead: {}", e.getMessage(), e);
         }
     }
 }

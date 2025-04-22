@@ -110,9 +110,11 @@ public class MessageService {
         }
 
         Conversation conversation = conversationOpt.get();
-        Pageable pageable = PageRequest.of(page, size, Sort.by("sentAt").descending());
+        // Use ascending order (oldest to newest) for better display in chat UI
+        Pageable pageable = PageRequest.of(page, size, Sort.by("sentAt").ascending());
 
-        Page<Message> messages = messageRepository.findByConversationOrderBySentAtDesc(conversation, pageable);
+        // Use the repository method that matches our sort order
+        Page<Message> messages = messageRepository.findByConversationOrderBySentAtAsc(conversation, pageable);
 
         return messages.map(this::convertToDTO);
     }
@@ -200,23 +202,23 @@ public class MessageService {
     private MessageDTO convertToDTO(Message message) {
         MessageDTO dto = new MessageDTO();
         dto.setId(message.getId());
-        
+
         if (message.getSender() != null) {
             dto.setSenderId(message.getSender().getId());
             dto.setSenderUsername(message.getSender().getUsername());
             dto.setSenderAvatarUrl(message.getSender().getAvatarUrl());
         }
-        
+
         if (message.getConversation() != null) {
             dto.setConversationId(message.getConversation().getId());
         }
-        
+
         dto.setContent(message.getContent());
         dto.setSentAt(message.getSentAt());
         dto.setDeliveredAt(message.getDeliveredAt());
         dto.setReadAt(message.getReadAt());
         dto.setStatus(message.getStatus());
-        
+
         return dto;
     }
 }

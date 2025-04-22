@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, tap } from 'rxjs/operators';
 import { environment } from '../../../../../environments/environment';
 import { ChatMessage, ChatConversation } from '../models';
 
@@ -84,9 +84,14 @@ export class ChatApiService {
     page: number = 0,
     size: number = 20
   ): Observable<ChatMessage[]> {
+    console.log(`Fetching messages for conversation ${conversationId}, page ${page}, size ${size}`);
+
     return this.http.get<ChatMessage[]>(
       `${this.baseUrl}/messages/conversation/${conversationId}?page=${page}&size=${size}`
     ).pipe(
+      tap(messages => {
+        console.log(`Received ${messages?.length || 0} messages for conversation ${conversationId}:`, messages);
+      }),
       catchError(error => {
         console.error(`Error fetching messages for conversation ${conversationId}:`, error);
         return throwError(() => error);

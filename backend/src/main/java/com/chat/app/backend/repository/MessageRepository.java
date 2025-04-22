@@ -29,6 +29,15 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     Page<Message> findByConversationOrderBySentAtDesc(Conversation conversation, Pageable pageable);
 
     /**
+     * Find all messages in a conversation, ordered by sent time ascending (oldest first).
+     *
+     * @param conversation the conversation to find messages for
+     * @param pageable pagination information
+     * @return a page of messages in the conversation
+     */
+    Page<Message> findByConversationOrderBySentAtAsc(Conversation conversation, Pageable pageable);
+
+    /**
      * Find all messages sent by a specific user in a conversation.
      *
      * @param sender the user who sent the messages
