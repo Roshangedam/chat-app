@@ -1,0 +1,36 @@
+name: Deploy Chat App to Google Cloud
+
+on:
+  push:
+    branches:
+      - master  # Change from 'main' to 'master'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH for GCP VM
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GCP_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Clean old app on VM
+        run: |
+          ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "rm -rf ~/chat-app && mkdir ~/chat-app"
+
+      - name: Copy code to VM
+        run: |
+          scp -r -i ~/.ssh/id_rsa ./* ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/chat-app
+
+      - name: Run Docker Compose on VM
+        run: |
+          ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+            cd ~/chat-app
+            docker-compose -f docker-compose.yml up -d
+          EOF

@@ -11,8 +11,8 @@ RUN npm ci
 # Copy the rest of the application code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application with Docker configuration
+RUN npm run build -- --configuration=docker
 
 # Runtime stage
 FROM nginx:alpine
@@ -23,8 +23,8 @@ COPY --from=build /app/dist/frontend/browser /usr/share/nginx/html
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 4200
-EXPOSE 4200
+# Expose port 80
+EXPOSE 80
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]

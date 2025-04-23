@@ -1,153 +1,150 @@
-🧠 AI Prompt: Scalable Real-Time Chat App with Angular + Spring Boot + WebSocket + Kafka + OAuth2 + MySQL + Docker (Standard Coding Practices)
-Build a production-grade, modular, real-time chat application using a monorepo architecture. The system should use Spring Boot (WebSocket + Kafka + OAuth2), a responsive Angular frontend, MySQL for persistence, and Docker for local development. All code must follow industry-standard best practices and clean code principles.
+# Chat App
 
-✅ Tech Stack
-Frontend: Angular (latest) + Angular Material or Tailwind CSS
+A scalable real-time chat application built with Angular, Spring Boot, WebSocket, Kafka, OAuth2, MySQL, and Docker.
 
-Backend: Spring Boot (latest) with Spring WebSocket, Kafka, Spring Security OAuth2
+## Project Overview
 
-Database: MySQL
+This is a production-grade, modular, real-time chat application using a monorepo architecture. The system uses Spring Boot (WebSocket + Kafka + OAuth2), a responsive Angular frontend, MySQL for persistence, and Docker for local development.
 
-Auth: OAuth2 (Google or internal provider), using JWT
+## Tech Stack
 
-Messaging: Kafka for real-time message/event stream
+- **Frontend**: Angular with Angular Material
+- **Backend**: Spring Boot with Spring WebSocket, Kafka, Spring Security OAuth2
+- **Database**: MySQL
+- **Authentication**: OAuth2 (Google) and JWT
+- **Messaging**: Kafka for real-time message/event stream
+- **Infrastructure**: Docker, Docker Compose
 
-Infra: Docker, Docker Compose
+## Prerequisites
 
-Architecture: Modular monorepo (frontend & backend)
+Before running the application, make sure you have the following installed on your system:
 
-Code Quality:
+- [Docker](https://www.docker.com/products/docker-desktop/) (version 20.10.0 or higher)
+- [Docker Compose](https://docs.docker.com/compose/install/) (version 2.0.0 or higher)
+- [Git](https://git-scm.com/downloads) (optional, for cloning the repository)
 
-Follows clean architecture principles
+## Running the Application with Docker Compose
 
-Uses standard naming conventions, DTOs, Service layers, and error handling
+### 1. Clone the repository (if not already done)
 
-Linting, formatting, and unit/integration testing in place
+```bash
+git clone <repository-url>
+cd chat-app
+```
 
-All endpoints documented with Swagger/OpenAPI
+### 2. Build and start the application
 
-📦 Monorepo Project Structure
-bash
-Copy
-Edit
+```bash
+docker-compose up -d
+```
+
+This command will:
+- Build the frontend and backend Docker images
+- Start all required services (MySQL, Zookeeper, Kafka, backend, frontend)
+- Set up the necessary networks and volumes
+
+### 3. Access the application
+
+Once all containers are up and running, you can access the application at:
+
+- **Frontend**: http://localhost:4200
+- **Backend API**: http://localhost:8080
+- **Swagger UI**: http://localhost:8080/swagger-ui.html
+
+### 4. Stop the application
+
+To stop all running containers:
+
+```bash
+docker-compose down
+```
+
+To stop and remove all volumes (this will delete all data including the database):
+
+```bash
+docker-compose down -v
+```
+
+## Running for Development
+
+If you want to run the application for development purposes, you can run the frontend and backend separately.
+
+### Backend (Spring Boot)
+
+1. Navigate to the backend directory:
+
+```bash
+cd backend
+```
+
+2. Run the application using Maven:
+
+```bash
+./mvnw spring-boot:run
+```
+
+The backend will be available at http://localhost:8080.
+
+### Frontend (Angular)
+
+1. Navigate to the frontend directory:
+
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Start the development server:
+
+```bash
+npm start
+```
+
+The frontend will be available at http://localhost:4200.
+
+## Environment Configuration
+
+### Backend Configuration
+
+The backend application can be configured using environment variables or by modifying the `application.properties` file. Key configuration options include:
+
+- `SPRING_DATASOURCE_URL`: Database connection URL
+- `SPRING_DATASOURCE_USERNAME`: Database username
+- `SPRING_DATASOURCE_PASSWORD`: Database password
+- `SPRING_KAFKA_BOOTSTRAP_SERVERS`: Kafka bootstrap servers
+- `CORS_ALLOWED_ORIGINS`: CORS allowed origins
+
+### Frontend Configuration
+
+The frontend application can be configured by modifying the environment files in the `frontend/src/environments` directory.
+
+## Features
+
+- OAuth2 login (Google/internal) with Spring Security
+- JWT token management
+- 1-to-1 & group chat
+- Kafka-based message queue
+- Message persistence in MySQL
+- Read receipts
+- Online/Offline/Away status via WebSocket heartbeat
+- Editable user profiles
+- Responsive UI for desktop & mobile layouts
+
+## Project Structure
+
+```
 /chat-app
 ├── /frontend/                    # Angular workspace
-│   ├── /src/app/chat-module/    # Reusable chat components/services
-│   ├── /src/app/auth-module/    # OAuth2 login + profile
-│   └── angular.json             # Project config
-├── /backend/
-│   ├── /chat-service/           # Spring Boot WebSocket + Kafka producer
-│   ├── /auth-service/           # OAuth2 & JWT issuance
-│   ├── /user-service/           # User CRUD, presence, profiles
-│   ├── /common-lib/             # Shared DTOs, configs, constants
-│   └── pom.xml                  # Maven multi-module project
-├── docker-compose.yml
-└── README.md
-✨ Key Features
-🔐 Authentication
-OAuth2 login (Google/internal) → Spring Security
+├── /backend/                     # Spring Boot application
+├── docker-compose.yml            # Docker Compose configuration
+└── README.md                     # This file
+```
 
-JWT token management
+## License
 
-Role-based access control (optional)
-
-Token-based WebSocket security
-
-💬 Chat System
-1-to-1 & group chat
-
-Kafka-based message queue (chat-messages)
-
-Message persistence in MySQL
-
-Read receipts
-
-Typing indicators (optional)
-
-WebSocket with STOMP
-
-👥 User & Presence
-Online/Offline/Away status via WebSocket heartbeat
-
-Kafka topic: presence-status
-
-Realtime user list updates
-
-👤 Profile Management
-Editable profile (name, avatar, bio)
-
-OAuth2 login auto-creates user
-
-JWT + MySQL user persistence
-
-📲 Responsive UI
-Angular Material or Tailwind
-
-Desktop & mobile layouts
-
-Modern chat UX: sidebar + chat window
-
-Angular services for API & WebSocket integration
-
-🧼 Code Practices & Standards
-🔁 Backend (Spring Boot)
-Layered architecture: Controller -> Service -> Repository
-
-DTOs for request/response
-
-@Validated inputs, global exception handling (@ControllerAdvice)
-
-Use MapStruct or manual mapping for DTO ↔ Entity
-
-Swagger/OpenAPI documentation
-
-Logging with SLF4J + centralized config
-
-Kafka producers/consumers structured via services
-
-JUnit + Mockito for unit tests
-
-🧹 Frontend (Angular)
-Lazy-loaded feature modules (chat, auth)
-
-@Injectable services for APIs, state, and sockets
-
-Strong typings (interfaces for DTOs)
-
-Global error handling (HTTP interceptors)
-
-Prettier + ESLint for formatting/linting
-
-RxJS best practices (unsubscribe, shareReplay)
-
-Responsive design: mobile-first
-
-🐳 Docker Environment
-docker-compose.yml includes:
-
-MySQL
-
-Kafka + Zookeeper
-
-Angular app
-
-Spring Boot services
-
-.env support for environment-specific configs
-
-Volumes for persistent MySQL/Kafka data
-
-✅ Deliverables
-Monorepo codebase: Angular + Spring Boot
-
-Dockerized setup for full stack
-
-OAuth2 login flow
-
-Secured, scalable WebSocket communication
-
-Kafka-backed chat message/event pipeline
-
-Responsive UI with chat UX
-
-Clean, documented, maintainable code
+[MIT License](LICENSE)

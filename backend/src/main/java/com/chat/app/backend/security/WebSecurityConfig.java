@@ -98,13 +98,34 @@ public class WebSecurityConfig {
      *
      * @return the configured CORS configuration source
      */
+    @Autowired
+    private org.springframework.core.env.Environment env;
+    
+    /**
+     * Configure CORS for the application.
+     * Reads allowed origins from application properties to support deployment in different environments.
+     *
+     * @return the configured CORS configuration source
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:4200"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+        
+        // Get allowed origins from application properties
+        String allowedOriginsStr = env.getProperty("app.cors.allowed-origins");
+        if (allowedOriginsStr != null && !allowedOriginsStr.trim().isEmpty()) {
+            // If specific origins are configured, use them
+            configuration.setAllowedOrigins(Arrays.asList(allowedOriginsStr.split(",")));
+        } else {
+            // Otherwise allow all origins for maximum flexibility
+            configuration.addAllowedOrigin("*");
+        }
+        
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
+        configuration.setExposedHeaders(Arrays.asList("Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"));
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -126,7 +147,7 @@ public class WebSecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> 
                 auth.requestMatchers("/api/v1/auth/**").permitAll()
-                    .requestMatchers("/api//v1/test/**").permitAll()
+                    .requestMatchers("/api/v1/test/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
                     .requestMatchers("/api/v1/oauth2/**").permitAll()
                     .requestMatchers("/api/v1/logs/**").permitAll()

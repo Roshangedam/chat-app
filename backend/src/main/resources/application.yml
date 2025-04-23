@@ -76,7 +76,7 @@ app:
     secret: ${JWT_SECRET:verySecretKeyThatShouldBeChangedInProduction}
     expiration-ms: 86400000 # 24 hours
   cors:
-    allowed-origins: http://localhost:4200
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
 
 # Profile-specific configurations
 ---
