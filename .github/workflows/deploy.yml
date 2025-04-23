@@ -36,7 +36,6 @@ jobs:
             export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
             export GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
             export GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-            export JWT_SECRET=${{ secrets.JWT_SECRET }}
             
             # Clean up any existing containers and volumes
             docker-compose down -v
