@@ -16,21 +16,24 @@ jobs:
       - name: Setup SSH for GCP VM
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.GCP_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.GCP_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
+          # Debug SSH key (safely)
+          ls -la ~/.ssh
+          ssh-keygen -l -f ~/.ssh/id_rsa || echo "Invalid key format"
 
       - name: Clean old app on VM
         run: |
-          ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "rm -rf ~/chat-app && mkdir ~/chat-app"
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "rm -rf ~/chat-app && mkdir ~/chat-app"
 
       - name: Copy code to VM
         run: |
-          scp -r -i ~/.ssh/id_rsa ./* ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/chat-app
+          scp -r -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new ./* ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/chat-app
 
       - name: Run Docker Compose on VM
         run: |
-          ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
             cd ~/chat-app
             docker-compose -f docker-compose.yml up -d
           EOF
