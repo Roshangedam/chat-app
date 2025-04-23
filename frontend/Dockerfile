@@ -12,7 +12,7 @@ RUN npm ci
 COPY . .
 
 # Build the application with Docker configuration
-RUN npm run build -- --configuration=docker --output-mode browser
+RUN npm run build -- --configuration=docker --output-mode static
 
 # Runtime stage
 FROM nginx:alpine
