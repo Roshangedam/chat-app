@@ -15,10 +15,10 @@ PORT=$(echo $DB_HOST | sed -E 's/.*:([0-9]+).*/\1/')
 
 # Wait for MySQL to be available
 echo "Checking MySQL connection..."
-until mysql -h"$HOST" -P"$PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1; do
-  echo "MySQL is unavailable - sleeping"
-  sleep 2
-done
+# until mysql -h"$HOST" -P"$PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1; do
+#   echo "MySQL is unavailable - sleeping"
+#   sleep 2
+# done
 
 echo "MySQL is up - executing initialization script"
 
