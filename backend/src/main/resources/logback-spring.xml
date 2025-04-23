@@ -42,27 +42,27 @@
     <!-- Logger for authentication and security -->
     <logger name="com.chat.app.backend.security" level="DEBUG" additivity="false">
         <appender-ref ref="Console" />
-        <appender-ref ref="AuthFile" />
+        <!-- <appender-ref ref="AuthFile" /> -->
     </logger>
 
     <logger name="com.chat.app.backend.service.AuthService" level="DEBUG" additivity="false">
         <appender-ref ref="Console" />
-        <appender-ref ref="AuthFile" />
+        <!-- <appender-ref ref="AuthFile" /> -->
     </logger>
 
     <logger name="com.chat.app.backend.controller.AuthController" level="DEBUG" additivity="false">
         <appender-ref ref="Console" />
-        <appender-ref ref="AuthFile" />
+        <!-- <appender-ref ref="AuthFile" /> -->
     </logger>
 
     <logger name="com.chat.app.backend.controller.OAuth2Controller" level="DEBUG" additivity="false">
         <appender-ref ref="Console" />
-        <appender-ref ref="AuthFile" />
+        <!-- <appender-ref ref="AuthFile" /> -->
     </logger>
 
     <!-- Root logger configuration -->
     <root level="INFO">
         <appender-ref ref="Console" />
-        <appender-ref ref="RollingFile" />
+        <!-- <appender-ref ref="RollingFile" /> -->
     </root>
 </configuration>

@@ -18,6 +18,9 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.GCP_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          # Add the GCP_SSH_PUB_KEY to the environment
+          echo "${{ secrets.GCP_SSH_PUB_KEY }}" > ~/.ssh/id_rsa.pub
+          chmod 644 ~/.ssh/id_rsa.pub
           ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
           # Debug SSH key (safely)
           ls -la ~/.ssh
@@ -35,5 +38,27 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
             cd ~/chat-app
+            # Set environment variables for database connection and OAuth2
+            export MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
+            export MYSQL_USER=${{ secrets.MYSQL_USER }}
+            export MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+            export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+            export SPRING_DATASOURCE_URL=${{ secrets.SPRING_DATASOURCE_URL }}
+            export SPRING_DATASOURCE_USERNAME=${{ secrets.SPRING_DATASOURCE_USERNAME }}
+            export SPRING_DATASOURCE_PASSWORD=${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+            export GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            export GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            export JWT_SECRET=${{ secrets.JWT_SECRET }}
+            export CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}
+            
+            # Run docker-compose with environment variables
             docker-compose -f docker-compose.yml up -d
+          EOF
+
+      - name: Remove Frontend and Backend Docker Images
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+            cd ~/chat-app
+            # Remove frontend and backend Docker images while keeping the containers running
+            docker image rm -f chat-app_frontend chat-app_backend
           EOF
