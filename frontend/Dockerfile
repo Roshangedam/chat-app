@@ -11,7 +11,7 @@ RUN npm ci
 # Copy the rest of the application code
 COPY . .
 
-# Build the application with Docker configuration
+# Build the application with Docker configuration - explicitly set output mode to static
 RUN npm run build -- --configuration=docker --output-mode static
 
 # Runtime stage
