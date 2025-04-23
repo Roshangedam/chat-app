@@ -150,3 +150,6 @@ The frontend application can be configured by modifying the environment files in
 [MIT License](LICENSE)
 
 
+
+
+nano ~/.ssh/authorized_keys
