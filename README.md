@@ -148,4 +148,3 @@ The frontend application can be configured by modifying the environment files in
 ## License
 
 [MIT License](LICENSE)
-
