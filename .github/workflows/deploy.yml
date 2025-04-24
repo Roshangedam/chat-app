@@ -23,31 +23,23 @@ jobs:
           echo "Host ${{ secrets.GCP_HOST }}" > ~/.ssh/config
           echo "  StrictHostKeyChecking no" >> ~/.ssh/config
           echo "  UserKnownHostsFile=/dev/null" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/id_rsa" >> ~/.ssh/config
-          echo "  PubkeyAcceptedKeyTypes +ssh-rsa" >> ~/.ssh/config
-          echo "  HostKeyAlgorithms +ssh-rsa" >> ~/.ssh/config
-          # Verify SSH key format
-          ssh-keygen -l -f ~/.ssh/id_rsa || echo "Invalid SSH key format"
           # Display debug info
           echo "Using identity file: ~/.ssh/id_rsa"
           echo "Connecting to: ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}"
-          # Display public key for verification
-          echo "Public key fingerprint:"
-          ssh-keygen -y -f ~/.ssh/id_rsa | ssh-keygen -E md5 -lf -
 
       - name: Clean old app on VM
         run: |
-          # Add debug information
-          echo "Connecting to ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}"
-          # Try SSH connection with verbose output
-          ssh -v -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "rm -rf ~/chat-app && mkdir ~/chat-app"
+          echo "Cleaning old app directory on VM..."
+          ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "rm -rf ~/chat-app && mkdir ~/chat-app"
 
       - name: Copy code to VM
         run: |
-          scp -v -r -i ~/.ssh/id_rsa ./* ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/chat-app
+          echo "Copying code to VM..."
+          scp -r -i ~/.ssh/id_rsa ./* ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/chat-app
 
       - name: Run Docker Compose on VM
         run: |
+          echo "Running Docker Compose on VM..."
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
             cd ~/chat-app
             # Set environment variables for database connection and OAuth2
@@ -64,6 +56,7 @@ jobs:
 
       - name: Remove Frontend and Backend Docker Images
         run: |
+          echo "Removing old Docker images..."
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
             cd ~/chat-app
             # Remove frontend and backend Docker images while keeping the containers running
