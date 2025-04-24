@@ -51,9 +51,7 @@ KAFKA_HOST=$(echo $KAFKA_HOST | sed -E 's/(.+):.*/\1/')
 echo "Adding Kafka host entry: $KAFKA_HOST"
 getent hosts $KAFKA_HOST || echo "Note: DNS resolution for $KAFKA_HOST will be handled by Docker"
 
-# Display network information for debugging
-echo "Network configuration:"
-ip addr show
+# Display DNS configuration for debugging
 echo "DNS configuration:"
 cat /etc/resolv.conf
 
