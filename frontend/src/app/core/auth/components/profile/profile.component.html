@@ -3,29 +3,29 @@
     <mat-card-header>
       <mat-card-title>My Profile</mat-card-title>
     </mat-card-header>
-    
+
     <mat-card-content>
       <div *ngIf="isLoading" class="loading-spinner">
         <mat-spinner diameter="40"></mat-spinner>
       </div>
-      
+
       <div *ngIf="!isLoading">
         <div class="avatar-container">
           <div class="avatar">
             <img [src]="currentUser?.avatarUrl || 'assets/images/user-avatar.png'" alt="Profile Avatar">
           </div>
-          <div class="status-badge" [ngClass]="currentUser?.status?.toLowerCase() || 'online'"></div>
+          <app-status-indicator *ngIf="currentUser" [userId]="currentUser.id" size="large"></app-status-indicator>
         </div>
-        
+
         <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
           <div *ngIf="successMessage" class="success-message">
             {{ successMessage }}
           </div>
-          
+
           <div *ngIf="errorMessage" class="error-message">
             {{ errorMessage }}
           </div>
-          
+
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Full Name</mat-label>
             <input matInput formControlName="fullName" placeholder="Enter your full name">
@@ -33,17 +33,17 @@
               Full name is required
             </mat-error>
           </mat-form-field>
-          
+
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Username</mat-label>
             <input matInput formControlName="username" placeholder="Username">
           </mat-form-field>
-          
+
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Email</mat-label>
             <input matInput formControlName="email" placeholder="Email">
           </mat-form-field>
-          
+
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Bio</mat-label>
             <textarea matInput formControlName="bio" placeholder="Tell us about yourself" rows="3"></textarea>
@@ -52,12 +52,12 @@
               Bio cannot exceed 200 characters
             </mat-error>
           </mat-form-field>
-          
+
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Avatar URL</mat-label>
             <input matInput formControlName="avatarUrl" placeholder="Enter avatar URL">
           </mat-form-field>
-          
+
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Status</mat-label>
             <mat-select formControlName="status" (selectionChange)="onStatusChange($event)">
@@ -72,7 +72,7 @@
               </mat-option>
             </mat-select>
           </mat-form-field>
-          
+
           <div class="form-actions">
             <button mat-raised-button color="primary" type="submit" [disabled]="profileForm.invalid || isSaving" class="full-width">
               <mat-spinner *ngIf="isSaving" diameter="20" class="spinner"></mat-spinner>

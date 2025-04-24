@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { AuthService, User } from '../../services/auth.service';
 import { CommonModule } from '@angular/common';
@@ -9,6 +9,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { UserStatusService } from '../../../../features/chat/api/services/user-status.service';
+import { Subscription } from 'rxjs';
+import { StatusIndicatorComponent } from '../../../../shared/components/status-indicator/status-indicator.component';
 
 @Component({
   selector: 'app-profile',
@@ -22,22 +25,26 @@ import { MatSelectModule } from '@angular/material/select';
     MatInputModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatSelectModule
+    MatSelectModule,
+    StatusIndicatorComponent
   ],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.css']
 })
-export class ProfileComponent implements OnInit {
+export class ProfileComponent implements OnInit, OnDestroy {
   profileForm: FormGroup;
   currentUser: User | null = null;
   isLoading = false;
   isSaving = false;
   successMessage = '';
   errorMessage = '';
-  
+
+  private subscriptions = new Subscription();
+
   constructor(
     private formBuilder: FormBuilder,
-    private authService: AuthService
+    private authService: AuthService,
+    private userStatusService: UserStatusService
   ) {
     this.profileForm = this.formBuilder.group({
       fullName: ['', Validators.required],
@@ -48,19 +55,28 @@ export class ProfileComponent implements OnInit {
       status: ['ONLINE']
     });
   }
-  
+
   ngOnInit(): void {
     this.loadUserProfile();
-    
+
     // Subscribe to user changes
-    this.authService.currentUser$.subscribe(user => {
-      if (user) {
-        this.currentUser = user;
-        this.updateFormValues(user);
-      }
-    });
+    this.subscriptions.add(
+      this.authService.currentUser$.subscribe(user => {
+        if (user) {
+          this.currentUser = user;
+          this.updateFormValues(user);
+        }
+      })
+    );
+
+    // Subscribe to user status updates
+    this.userStatusService.subscribeToUserStatus();
   }
-  
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+  }
+
   loadUserProfile(): void {
     this.isLoading = true;
     this.authService.getUserProfile().subscribe({
@@ -75,7 +91,7 @@ export class ProfileComponent implements OnInit {
       }
     });
   }
-  
+
   updateFormValues(user: User): void {
     this.profileForm.patchValue({
       fullName: user.fullName || '',
@@ -86,28 +102,28 @@ export class ProfileComponent implements OnInit {
       status: user.status || 'ONLINE'
     });
   }
-  
+
   onSubmit(): void {
     if (this.profileForm.invalid) {
       return;
     }
-    
+
     this.successMessage = '';
     this.errorMessage = '';
     this.isSaving = true;
-    
+
     const profileData = {
       fullName: this.profileForm.value.fullName,
       bio: this.profileForm.value.bio,
       avatarUrl: this.profileForm.value.avatarUrl,
       status: this.profileForm.value.status
     };
-    
+
     this.authService.updateProfile(profileData).subscribe({
       next: () => {
         this.successMessage = 'Profile updated successfully';
         this.isSaving = false;
-        
+
         // Clear success message after 3 seconds
         setTimeout(() => {
           this.successMessage = '';
@@ -119,11 +135,20 @@ export class ProfileComponent implements OnInit {
       }
     });
   }
-  
+
   onStatusChange(event: any): void {
     const status = event.value;
     if (this.currentUser && this.currentUser.status !== status) {
+      // Update status in both AuthService and UserStatusService
       this.authService.updateProfile({ status }).subscribe({
+        next: () => {
+          // Also update the status in the UserStatusService
+          this.userStatusService.updateStatus(status).subscribe({
+            error: (err) => {
+              console.error('Error updating status in UserStatusService:', err);
+            }
+          });
+        },
         error: (error) => {
           this.errorMessage = error.message || 'Failed to update status';
           // Revert to previous status in form
@@ -133,5 +158,21 @@ export class ProfileComponent implements OnInit {
         }
       });
     }
+  }
+
+  /**
+   * Get the current user's status, prioritizing real-time status
+   */
+  getUserStatus(): string {
+    if (!this.currentUser) return 'OFFLINE';
+
+    // First check if we have a real-time status from the UserStatusService
+    const realTimeStatus = this.userStatusService.getUserStatus(this.currentUser.id);
+    if (realTimeStatus) {
+      return realTimeStatus;
+    }
+
+    // Fall back to the status stored in the user object
+    return this.currentUser.status || 'OFFLINE';
   }
 }

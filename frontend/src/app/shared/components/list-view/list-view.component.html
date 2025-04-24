@@ -36,9 +36,11 @@
          class="conversation-item">
         <div matListItemAvatar class="avatar-container">
           <img [src]="getAvatarUrl(conversation)" alt="Avatar" class="avatar">
-          <span *ngIf="!conversation.groupChat"
-                class="status-indicator"
-                [ngClass]="conversation.participants[0]?.status?.toLowerCase() || 'offline'"></span>
+          <ng-container *ngIf="!conversation.groupChat">
+            <ng-container *ngIf="getOtherParticipant(conversation) as otherParticipant">
+              <app-status-indicator [userId]="otherParticipant.id"></app-status-indicator>
+            </ng-container>
+          </ng-container>
         </div>
 
         <div matListItemTitle class="conversation-title">
@@ -66,7 +68,7 @@
          class="contact-item">
         <div matListItemAvatar class="avatar-container">
           <img [src]="getAvatarUrl(contact)" alt="Avatar" class="avatar">
-          <span class="status-indicator" [ngClass]="getUserStatus(contact).toLowerCase()"></span>
+          <app-status-indicator [userId]="contact.id"></app-status-indicator>
         </div>
 
         <div matListItemTitle class="contact-name">

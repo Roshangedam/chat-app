@@ -227,12 +227,64 @@ export class AuthService {
 
     this.loggingService.logInfo(`Logging out user: ${username}`);
 
-    // Clear auth data
-    this.clearAuthData();
+    // First update user status to OFFLINE via UserStatusService
+    try {
+      // Dynamically import to avoid circular dependencies
+      import('../../../features/chat/api/services/user-status.service').then(module => {
+        const UserStatusService = module.UserStatusService;
+        try {
+          const userStatusService = this.injector.get(UserStatusService);
+          if (userStatusService && typeof userStatusService.updateStatus === 'function') {
+            // Update status to OFFLINE
+            userStatusService.updateStatus('OFFLINE').subscribe({
+              next: () => {
+                this.loggingService.logInfo('User status set to OFFLINE');
+                this.completeLogout(username);
+              },
+              error: (err) => {
+                this.loggingService.logError('Failed to set user status to OFFLINE', err);
+                this.completeLogout(username);
+              }
+            });
+          } else {
+            this.completeLogout(username);
+          }
+        } catch (error) {
+          this.loggingService.logWarning('User status service not available', error);
+          this.completeLogout(username);
+        }
+      }).catch(error => {
+        this.loggingService.logError('Error importing UserStatusService', error);
+        this.completeLogout(username);
+      });
+    } catch (error) {
+      this.loggingService.logWarning('Error during status update', error);
+      this.completeLogout(username);
+    }
+  }
 
-    // Redirect to login
-    this.router.navigate(['/auth/login']);
-    this.loggingService.logInfo(`User logged out successfully: ${username}`);
+  /**
+   * Complete the logout process by calling the server and clearing local data
+   */
+  private completeLogout(username: string): void {
+    // Call the backend logout endpoint with responseType: 'text' to handle plain text response
+    this.http.post(`${environment.apiUrl}/api/v1/users/logout`, {}, { responseType: 'text' }).subscribe({
+      next: (response) => {
+        this.loggingService.logInfo(`User logged out on server: ${response}`);
+        // Clear auth data
+        this.clearAuthData();
+
+        // Redirect to login
+        this.router.navigate(['/auth/login']);
+        this.loggingService.logInfo(`User logged out successfully: ${username}`);
+      },
+      error: (err) => {
+        this.loggingService.logError('Failed to logout on server', err);
+        // Still clear auth data and redirect even if server logout fails
+        this.clearAuthData();
+        this.router.navigate(['/auth/login']);
+      }
+    });
   }
 
   // Refresh token
@@ -463,26 +515,95 @@ export class AuthService {
     // Use setTimeout to break the circular dependency chain
     setTimeout(() => {
       try {
-        // Dynamically import the services to avoid circular dependencies
-        import('../../../features/chat/api/services/chat.service').then(module => {
-          const ChatService = module.ChatService;
-          const chatService = this.injector.get(ChatService);
-          if (chatService && typeof chatService.initialize === 'function') {
-            chatService.initialize(token);
-            chatService.loadConversations().subscribe();
-          }
-        });
+        // First initialize the WebSocket service to ensure connection is established
+        import('../../../features/chat/api/websocket/chat-websocket.service').then(module => {
+          const ChatWebsocketService = module.ChatWebsocketService;
+          const websocketService = this.injector.get(ChatWebsocketService);
+          if (websocketService && typeof websocketService.initialize === 'function') {
+            this.loggingService.logInfo('Initializing WebSocket connection');
+            websocketService.initialize(token);
 
-        import('../../../features/chat/api/services/user.service').then(module => {
-          const UserService = module.UserService;
-          const userService = this.injector.get(UserService);
-          if (userService && typeof userService.loadUsers === 'function') {
-            userService.loadUsers().subscribe();
+            // Wait for WebSocket connection before initializing other services
+            const connectionSub = websocketService.connectionStatus$.subscribe(connected => {
+              if (connected) {
+                this.loggingService.logInfo('WebSocket connected, initializing other services');
+                connectionSub.unsubscribe();
+                this.initializeOtherServices(token);
+              }
+            });
+
+            // Set a timeout to initialize other services even if WebSocket connection fails
+            setTimeout(() => {
+              if (!websocketService.isConnected()) {
+                this.loggingService.logWarning('WebSocket connection timeout, initializing other services anyway');
+                connectionSub.unsubscribe();
+                this.initializeOtherServices(token);
+              }
+            }, 5000); // 5 second timeout
+          } else {
+            this.loggingService.logWarning('WebSocket service not available, initializing other services directly');
+            this.initializeOtherServices(token);
           }
+        }).catch(error => {
+          this.loggingService.logError('Error importing WebSocket service', error);
+          this.initializeOtherServices(token);
         });
       } catch (error) {
         this.loggingService.logError('Error initializing chat services', error);
+        this.initializeOtherServices(token);
       }
     }, 0);
+  }
+
+  /**
+   * Initialize other services after WebSocket connection is established
+   */
+  private initializeOtherServices(token: string): void {
+    try {
+      // Dynamically import the services to avoid circular dependencies
+      import('../../../features/chat/api/services/chat.service').then(module => {
+        const ChatService = module.ChatService;
+        const chatService = this.injector.get(ChatService);
+        if (chatService && typeof chatService.initialize === 'function') {
+          chatService.initialize(token);
+          chatService.loadConversations().subscribe();
+        }
+      });
+
+      import('../../../features/chat/api/services/user.service').then(module => {
+        const UserService = module.UserService;
+        const userService = this.injector.get(UserService);
+        if (userService && typeof userService.loadUsers === 'function') {
+          userService.loadUsers().subscribe();
+        }
+      });
+
+      // Initialize user status service and set status to ONLINE
+      import('../../../features/chat/api/services/user-status.service').then(module => {
+        const UserStatusService = module.UserStatusService;
+        try {
+          const userStatusService = this.injector.get(UserStatusService);
+          if (userStatusService) {
+            // First load all user statuses
+            userStatusService.loadAllUserStatuses().subscribe({
+              next: () => {
+                this.loggingService.logInfo('Loaded initial user statuses');
+
+                // Then update current user status to ONLINE
+                userStatusService.updateStatus('ONLINE').subscribe({
+                  next: () => this.loggingService.logInfo('User status set to ONLINE'),
+                  error: (err) => this.loggingService.logError('Failed to set user status to ONLINE', err)
+                });
+              },
+              error: (err) => this.loggingService.logError('Failed to load initial user statuses', err)
+            });
+          }
+        } catch (error) {
+          this.loggingService.logWarning('User status service not available', error);
+        }
+      });
+    } catch (error) {
+      this.loggingService.logError('Error initializing other services', error);
+    }
   }
 }

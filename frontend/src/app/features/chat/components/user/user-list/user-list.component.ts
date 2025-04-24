@@ -1,4 +1,4 @@
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, OnDestroy, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatListModule } from '@angular/material/list';
@@ -10,7 +10,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { UserService } from '../../../api/services/user.service';
 import { ChatService } from '../../../api/services/chat.service';
+import { UserStatusService } from '../../../api/services/user-status.service';
 import { ChatUser } from '../../../api/models';
+import { Subscription } from 'rxjs';
+import { StatusIndicatorComponent } from '../../../../../shared/components/status-indicator/status-indicator.component';
 
 /**
  * Component for displaying a list of users.
@@ -28,38 +31,53 @@ import { ChatUser } from '../../../api/models';
     MatFormFieldModule,
     MatProgressSpinnerModule,
     MatButtonModule,
-    MatDividerModule
+    MatDividerModule,
+    StatusIndicatorComponent
   ],
   templateUrl: './user-list.component.html',
   styleUrls: ['./user-list.component.css']
 })
-export class UserListComponent implements OnInit {
+export class UserListComponent implements OnInit, OnDestroy {
   @Output() startChat = new EventEmitter<ChatUser>();
-  
+
   users: ChatUser[] = [];
   filteredUsers: ChatUser[] = [];
   searchQuery: string = '';
   isLoading = false;
   error: string | null = null;
 
+  private subscriptions = new Subscription();
+
   constructor(
     private userService: UserService,
-    private chatService: ChatService
+    private chatService: ChatService,
+    private userStatusService: UserStatusService
   ) {}
 
   ngOnInit(): void {
     this.loadUsers();
-    
+
     // Subscribe to loading state
-    this.userService.loading$.subscribe(loading => {
-      this.isLoading = loading;
-    });
-    
+    this.subscriptions.add(
+      this.userService.loading$.subscribe(loading => {
+        this.isLoading = loading;
+      })
+    );
+
     // Subscribe to users
-    this.userService.users$.subscribe(users => {
-      this.users = users;
-      this.applyFilter();
-    });
+    this.subscriptions.add(
+      this.userService.users$.subscribe(users => {
+        this.users = users;
+        this.applyFilter();
+      })
+    );
+
+    // Subscribe to user status updates
+    this.userStatusService.subscribeToUserStatus();
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
   }
 
   /**
@@ -83,7 +101,7 @@ export class UserListComponent implements OnInit {
       this.applyFilter();
       return;
     }
-    
+
     this.error = null;
     this.userService.searchUsers(this.searchQuery).subscribe({
       next: (users) => {
@@ -104,10 +122,10 @@ export class UserListComponent implements OnInit {
       this.filteredUsers = [...this.users];
       return;
     }
-    
+
     const query = this.searchQuery.toLowerCase();
-    this.filteredUsers = this.users.filter(user => 
-      user.username.toLowerCase().includes(query) || 
+    this.filteredUsers = this.users.filter(user =>
+      user.username.toLowerCase().includes(query) ||
       (user.fullName && user.fullName.toLowerCase().includes(query))
     );
   }
@@ -118,7 +136,7 @@ export class UserListComponent implements OnInit {
    */
   onStartChat(user: ChatUser): void {
     this.startChat.emit(user);
-    
+
     // Create a one-to-one conversation
     this.chatService.createOneToOneConversation(user.id).subscribe({
       next: (conversation) => {
@@ -141,9 +159,23 @@ export class UserListComponent implements OnInit {
 
   /**
    * Get the status class for a user
-   * @param status User status
+   * @param user The user or user status
    */
-  getStatusClass(status?: string): string {
+  getStatusClass(userOrStatus?: ChatUser | string): string {
+    // If input is a user object
+    if (userOrStatus && typeof userOrStatus !== 'string') {
+      const user = userOrStatus as ChatUser;
+      // First check if we have a real-time status from the UserStatusService
+      const realTimeStatus = this.userStatusService.getUserStatus(user.id);
+      if (realTimeStatus) {
+        return realTimeStatus.toLowerCase();
+      }
+      // Fall back to the status stored in the user object
+      return user.status?.toLowerCase() || 'offline';
+    }
+
+    // If input is a status string
+    const status = userOrStatus as string;
     if (!status) return 'offline';
     return status.toLowerCase();
   }

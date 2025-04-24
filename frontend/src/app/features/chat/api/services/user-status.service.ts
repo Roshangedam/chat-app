@@ -1,0 +1,151 @@
+import { Injectable, OnDestroy } from '@angular/core';
+import { BehaviorSubject, Observable, Subscription, of } from 'rxjs';
+import { catchError, tap, filter } from 'rxjs/operators';
+import { ChatWebsocketService } from '../websocket/chat-websocket.service';
+import { ChatUser } from '../models';
+import { UserApiService } from './user-api.service';
+
+/**
+ * Service for handling user status updates.
+ */
+@Injectable({
+  providedIn: 'root'
+})
+export class UserStatusService implements OnDestroy {
+  private userStatusMap = new BehaviorSubject<Map<string, string>>(new Map());
+  private subscriptions = new Subscription();
+  private initialized = false;
+
+  // Observable streams
+  public userStatus$ = this.userStatusMap.asObservable();
+
+  constructor(
+    private websocketService: ChatWebsocketService,
+    private userApiService: UserApiService
+  ) {
+    // Subscribe to WebSocket connection status
+    this.subscriptions.add(
+      this.websocketService.connectionStatus$.pipe(
+        filter(connected => connected) // Only proceed when connected
+      ).subscribe(() => {
+        if (!this.initialized) {
+          this.initialized = true;
+          this.subscribeToStatusUpdates();
+          console.log('UserStatusService: WebSocket connected, subscribed to status updates');
+        }
+      })
+    );
+  }
+
+  /**
+   * Subscribe to user status updates from WebSocket
+   */
+  private subscribeToStatusUpdates(): void {
+    if (!this.websocketService.isConnected()) {
+      console.warn('UserStatusService: WebSocket not connected, cannot subscribe to status updates');
+      return;
+    }
+
+    // Subscribe to the global user status topic
+    this.websocketService.subscribeToUserStatus();
+
+    // Listen for status updates
+    const statusSub = this.websocketService.userStatus$.subscribe(statusUpdate => {
+      if (!statusUpdate || !statusUpdate.userId) {
+        console.warn('UserStatusService: Received invalid status update', statusUpdate);
+        return;
+      }
+
+      console.log(`UserStatusService: Received status update for user ${statusUpdate.userId}: ${statusUpdate.status}`);
+      const statusMap = this.userStatusMap.value;
+      statusMap.set(String(statusUpdate.userId), statusUpdate.status);
+      this.userStatusMap.next(new Map(statusMap)); // Create a new Map to trigger change detection
+    });
+
+    this.subscriptions.add(statusSub);
+  }
+
+  /**
+   * Subscribe to user status updates from WebSocket (public method for external components)
+   */
+  public subscribeToUserStatus(): void {
+    if (this.websocketService.isConnected()) {
+      this.websocketService.subscribeToUserStatus();
+    } else {
+      console.warn('UserStatusService: WebSocket not connected, cannot subscribe to status updates');
+    }
+  }
+
+  /**
+   * Update the current user's status
+   * @param status New status
+   */
+  public updateStatus(status: 'ONLINE' | 'AWAY' | 'OFFLINE'): Observable<ChatUser> {
+    // First update via HTTP API
+    return this.userApiService.updateStatus(status).pipe(
+      tap(user => {
+        console.log(`UserStatusService: Status updated via API to ${status} for user ${user.id}`);
+
+        // Also update the local status map immediately
+        const statusMap = this.userStatusMap.value;
+        statusMap.set(String(user.id), status);
+        this.userStatusMap.next(new Map(statusMap)); // Create a new Map to trigger change detection
+
+        // If WebSocket is connected, also send the status update via WebSocket
+        if (this.websocketService.isConnected()) {
+          this.websocketService.sendUserStatus(status);
+        }
+      }),
+      catchError(error => {
+        console.error('UserStatusService: Failed to update status via API', error);
+        return of(null as unknown as ChatUser);
+      })
+    );
+  }
+
+  /**
+   * Get a user's status
+   * @param userId ID of the user
+   * @returns The user's status or 'OFFLINE' if not found
+   */
+  public getUserStatus(userId: string | number): string {
+    if (!userId) return 'OFFLINE';
+
+    const statusMap = this.userStatusMap.value;
+    const status = statusMap.get(String(userId));
+
+    return status || 'OFFLINE';
+  }
+
+  /**
+   * Load initial status for all users
+   */
+  public loadAllUserStatuses(): Observable<any> {
+    return this.userApiService.getAllUsers().pipe(
+      tap(users => {
+        const statusMap = this.userStatusMap.value;
+
+        // Update status map with all users
+        users.forEach(user => {
+          if (user && user.id) {
+            statusMap.set(String(user.id), user.status || 'OFFLINE');
+          }
+        });
+
+        this.userStatusMap.next(new Map(statusMap)); // Create a new Map to trigger change detection
+        console.log(`UserStatusService: Loaded status for ${users.length} users`);
+      }),
+      catchError(error => {
+        console.error('UserStatusService: Failed to load user statuses', error);
+        return of(null);
+      })
+    );
+  }
+
+  /**
+   * Clean up resources when the service is destroyed
+   */
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+  }
+}

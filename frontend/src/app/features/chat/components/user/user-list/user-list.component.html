@@ -51,7 +51,7 @@
           <img
             [src]="user.avatarUrl || 'assets/images/user-avatar.png'"
             alt="{{ user.username }}'s avatar">
-          <span class="status-indicator" [ngClass]="getStatusClass(user.status)"></span>
+          <app-status-indicator [userId]="user.id"></app-status-indicator>
         </div>
         <div class="user-info">
           <h3 class="user-name">{{ user.fullName || user.username }}</h3>

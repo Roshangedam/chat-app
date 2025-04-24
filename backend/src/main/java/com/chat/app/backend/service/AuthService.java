@@ -6,10 +6,12 @@ import com.chat.app.backend.dto.auth.RefreshTokenRequest;
 import com.chat.app.backend.dto.auth.SignupRequest;
 import com.chat.app.backend.model.Role;
 import com.chat.app.backend.model.User;
+import com.chat.app.backend.model.UserStatus;
 import com.chat.app.backend.repository.RoleRepository;
 import com.chat.app.backend.repository.UserRepository;
 import com.chat.app.backend.security.jwt.JwtUtils;
 import com.chat.app.backend.security.jwt.UserDetailsImpl;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jws;
@@ -54,6 +56,9 @@ public class AuthService {
     @Autowired
     private JwtUtils jwtUtils;
 
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
     /**
      * Authenticate a user and generate a JWT token.
      *
@@ -62,7 +67,7 @@ public class AuthService {
      */
     public JwtResponse authenticateUser(LoginRequest loginRequest) {
         logger.debug("Attempting to authenticate user: {}", loginRequest.getUsernameOrEmail());
-        
+
         try {
             // Authenticate the user
             Authentication authentication = authenticationManager.authenticate(
@@ -70,27 +75,41 @@ public class AuthService {
 
             // Set the authentication in the security context
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            
+
             // Generate JWT token
             String jwt = jwtUtils.generateJwtToken(authentication);
-            
+
             // Get user details from the authentication object
             UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-            
+
             // Get user from repository to generate refresh token
             User user = userRepository.findByUsername(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("User not found"));
-            
+
+            // Update user status to ONLINE
+            user.setStatus(UserStatus.ONLINE);
+            user.setLastActive(LocalDateTime.now());
+            user = userRepository.save(user);
+
+            // Broadcast status update to all connected clients
+            messagingTemplate.convertAndSend("/topic/user.status",
+                new com.chat.app.backend.dto.UserStatusDTO(
+                    user.getId(),
+                    user.getUsername(),
+                    UserStatus.ONLINE
+                )
+            );
+
             // Generate refresh token
             String refreshToken = jwtUtils.generateRefreshToken(user);
-            
+
             // Get user roles
             List<String> roles = userDetails.getAuthorities().stream()
                     .map(item -> item.getAuthority())
                     .collect(Collectors.toList());
 
             logger.info("User authenticated successfully: {}", userDetails.getUsername());
-            
+
             // Return JWT response with token and user details
             return new JwtResponse(
                     jwt,
@@ -113,9 +132,9 @@ public class AuthService {
      * @return true if registration is successful, false otherwise
      */
     public boolean registerUser(SignupRequest signupRequest) {
-        logger.debug("Attempting to register new user with username: {} and email: {}", 
+        logger.debug("Attempting to register new user with username: {} and email: {}",
                 signupRequest.getUsername(), signupRequest.getEmail());
-        
+
         try {
             // Check if username already exists
             if (userRepository.existsByUsername(signupRequest.getUsername())) {
@@ -137,7 +156,7 @@ public class AuthService {
 
             // Set full name if provided
             user.setFullName(signupRequest.getFullName());
-            
+
             // Set creation and update timestamps
             LocalDateTime now = LocalDateTime.now();
             user.setCreatedAt(now);
@@ -155,7 +174,7 @@ public class AuthService {
 
             // Save user to database
             userRepository.save(user);
-            
+
             logger.info("User registered successfully: {}", user.getUsername());
             return true;
         } catch (Exception e) {
@@ -163,7 +182,7 @@ public class AuthService {
             throw e;
         }
     }
-    
+
     /**
      * Refresh access token using refresh token.
      *
@@ -172,31 +191,31 @@ public class AuthService {
      */
     public JwtResponse refreshToken(String refreshToken) {
         logger.debug("Attempting to refresh token");
-        
+
         try {
             // Validate refresh token and extract username
             String username = jwtUtils.getUserNameFromJwtToken(refreshToken);
-            
+
             if (username == null) {
                 logger.error("Invalid refresh token");
                 throw new RuntimeException("Invalid refresh token");
             }
-            
+
             // Get user details
             User user = userRepository.findByUsername(username)
                     .orElseThrow(() -> {
                         logger.error("User not found for refresh token");
                         return new RuntimeException("User not found for refresh token");
                     });
-            
+
             // Generate new access token
             String accessToken = jwtUtils.generateJwtToken(user);
-            
+
             // Generate new refresh token
             String newRefreshToken = jwtUtils.generateRefreshToken(user);
-            
+
             logger.info("Token refreshed successfully for user: {}", username);
-            
+
             // Return JWT response with new tokens and user details
             return new JwtResponse(
                     accessToken,
