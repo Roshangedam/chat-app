@@ -1,62 +1,43 @@
 #!/bin/sh
-set -e
-
+# Simple startup script for the backend service
 echo "=== Chat App Backend Startup ==="
 
-# Extract database connection details from JDBC URL
-echo "Parsing database connection details..."
-DB_URL=${SPRING_DATASOURCE_URL:-jdbc:mysql://mysql:3306/chatapp}
+# Wait for MySQL to be ready
+echo "Waiting for MySQL..."
+sleep 5
+
+# Extract database connection details
+DB_HOST=${SPRING_DATASOURCE_URL:-jdbc:mysql://mysql:3306/chatapp}
+DB_HOST=$(echo $DB_HOST | sed -E 's/.*mysql:\/\/([^:\/]+).*/\1/')
 DB_USER=${SPRING_DATASOURCE_USERNAME:-root}
 DB_PASSWORD=${SPRING_DATASOURCE_PASSWORD:-rootpassword}
 
-# Extract host and port from JDBC URL
-DB_HOST=$(echo $DB_URL | sed -E 's/.*mysql:\/\/([^:\/]+).*/\1/')
-DB_PORT=$(echo $DB_URL | sed -E 's/.*:([0-9]+).*/\1/')
-DB_NAME=$(echo $DB_URL | sed -E 's/.*\/([^?]+).*/\1/')
+echo "Database host: $DB_HOST"
 
-echo "Database connection: Host=$DB_HOST, Port=$DB_PORT, Database=$DB_NAME"
-
-# Wait for MySQL to be available with timeout
+# Basic check for MySQL
 echo "Checking MySQL connection..."
-RETRY_COUNT=0
-MAX_RETRIES=15
+for i in $(seq 1 10); do
+  echo "Attempt $i: Checking MySQL connection..."
+  mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo "MySQL is available!"
 
-until mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1; do
-  RETRY_COUNT=$((RETRY_COUNT+1))
-  if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-    echo "Warning: Could not connect to MySQL after $MAX_RETRIES attempts, but will continue startup"
+    # Run initialization script if it exists
+    if [ -f /app/db/init.sql ]; then
+      echo "Running initialization script..."
+      mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" < /app/db/init.sql
+    fi
     break
   fi
-  echo "MySQL is unavailable (attempt $RETRY_COUNT/$MAX_RETRIES) - sleeping"
+  echo "MySQL not available yet, waiting..."
   sleep 2
 done
 
-if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-  echo "MySQL is up - executing initialization script"
-  # Run the initialization script if it exists
-  if [ -f /app/db/init.sql ]; then
-    mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" < /app/db/init.sql
-  else
-    echo "No initialization script found, skipping"
-  fi
-fi
+# Simple hosts file setup
+echo "Setting up hosts file..."
+echo "127.0.0.1 localhost" > /etc/hosts
+echo "127.0.0.1 $(hostname)" >> /etc/hosts
 
-# Basic network configuration to help with service discovery
-echo "Setting up network configuration..."
-echo "127.0.0.1 localhost $(hostname)" > /etc/hosts
-
-# Add Kafka host entry
-KAFKA_HOST=${SPRING_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
-KAFKA_HOST=$(echo $KAFKA_HOST | sed -E 's/(.+):.*/\1/')
-echo "Adding Kafka host entry: $KAFKA_HOST"
-getent hosts $KAFKA_HOST || echo "Note: DNS resolution for $KAFKA_HOST will be handled by Docker"
-
-# Display DNS configuration for debugging
-echo "DNS configuration:"
-cat /etc/resolv.conf
-
+# Start the application
 echo "Starting Spring Boot application..."
-echo "Note: The application is configured to handle Kafka connectivity issues gracefully"
-
-# Start the application with appropriate JVM options
-exec java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -jar app.jar
+exec java -jar app.jar
