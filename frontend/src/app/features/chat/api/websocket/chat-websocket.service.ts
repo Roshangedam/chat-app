@@ -1,5 +1,5 @@
 import { Injectable, OnDestroy } from '@angular/core';
-import { BehaviorSubject, Observable, Subject } from 'rxjs';
+import { BehaviorSubject, Subject, Observable } from 'rxjs';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { environment } from '../../../../../environments/environment';
@@ -16,13 +16,15 @@ export class ChatWebsocketService implements OnDestroy {
   private stompClient!: Client;
   private subscriptions: Map<string, StompSubscription> = new Map();
   private connectionStatusSubject = new BehaviorSubject<boolean>(false);
+  public connectionStatus$: Observable<boolean> = this.connectionStatusSubject.asObservable();
   private messageReceivedSubject = new Subject<ChatMessage>();
   private typingStatusSubject = new Subject<{conversationId: string | number, username: string, isTyping: boolean}>();
+  private userStatusSubject = new Subject<{userId: string | number, username: string, status: string}>();
 
   // Observable streams
-  public connectionStatus$ = this.connectionStatusSubject.asObservable();
   public messageReceived$ = this.messageReceivedSubject.asObservable();
   public typingStatus$ = this.typingStatusSubject.asObservable();
+  public userStatus$ = this.userStatusSubject.asObservable();
 
   constructor() {}
 
@@ -53,7 +55,7 @@ export class ChatWebsocketService implements OnDestroy {
     });
 
     // Set up connection event handlers
-    this.stompClient.onConnect = (frame) => {
+    this.stompClient.onConnect = () => {
       console.log('Connected to WebSocket');
       this.connectionStatusSubject.next(true);
     };
@@ -251,6 +253,72 @@ export class ChatWebsocketService implements OnDestroy {
         conversationId: conversationId
       })
     });
+  }
+
+  /**
+   * Subscribe to global user status updates
+   */
+  public subscribeToUserStatus(): void {
+    if (!this.stompClient || !this.stompClient.connected) {
+      return;
+    }
+
+    const destination = `/topic/user.status`;
+
+    // Check if already subscribed
+    if (this.subscriptions.has(destination)) {
+      return;
+    }
+
+    // Subscribe to the user status topic
+    const subscription = this.stompClient.subscribe(destination, (message: IMessage) => {
+      try {
+        if (message && message.body) {
+          const statusData = JSON.parse(message.body);
+          if (statusData && statusData.userId && statusData.status) {
+            this.userStatusSubject.next({
+              userId: statusData.userId,
+              username: statusData.username || '',
+              status: statusData.status
+            });
+          } else {
+            console.warn('Received invalid user status data');
+          }
+        } else {
+          console.warn('Received empty user status update');
+        }
+      } catch (error) {
+        console.error('Error parsing user status update:', error);
+      }
+    });
+
+    // Store the subscription
+    this.subscriptions.set(destination, subscription);
+  }
+
+  /**
+   * Send a user status update
+   * @param status New status (ONLINE, AWAY, OFFLINE)
+   */
+  public sendUserStatus(status: string): void {
+    if (!this.stompClient || !this.stompClient.connected) {
+      return;
+    }
+
+    this.stompClient.publish({
+      destination: '/app/user.status',
+      body: JSON.stringify({
+        status: status
+      })
+    });
+  }
+
+  /**
+   * Check if the WebSocket is connected
+   * @returns True if connected, false otherwise
+   */
+  public isConnected(): boolean {
+    return this.stompClient && this.stompClient.connected;
   }
 
   /**

@@ -9,12 +9,12 @@
         [matTooltip]="compactMode ? (currentUser?.fullName || currentUser?.username || 'Guest User') : ''"
         [matTooltipPosition]="'right'"
       >
-      <span class="status-indicator" [ngClass]="currentUser?.status?.toLowerCase() || 'offline'"></span>
+      <app-status-indicator *ngIf="currentUser" [userId]="currentUser.id"></app-status-indicator>
     </div>
 
     <div class="profile-info" *ngIf="!compactMode">
       <h3 class="profile-name">{{ currentUser?.fullName || currentUser?.username || 'Guest User' }}</h3>
-      <p class="profile-status">{{ currentUser?.status || 'OFFLINE' | titlecase }}</p>
+      <p class="profile-status">{{ getUserStatus() | titlecase }}</p>
     </div>
 
     <button mat-icon-button [matMenuTriggerFor]="profileMenu" aria-label="Profile menu">

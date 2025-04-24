@@ -39,10 +39,10 @@ public class WebSecurityConfig {
 
     @Autowired
     private AuthEntryPointJwt unauthorizedHandler;
-    
+
     @Autowired
     private OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
-    
+
     @Autowired
     private OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
 
@@ -64,10 +64,10 @@ public class WebSecurityConfig {
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        
+
         authProvider.setUserDetailsService(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
-        
+
         return authProvider;
     }
 
@@ -100,7 +100,7 @@ public class WebSecurityConfig {
      */
     @Autowired
     private org.springframework.core.env.Environment env;
-    
+
     /**
      * Configure CORS for the application.
      * Reads allowed origins from application properties to support deployment in different environments.
@@ -110,23 +110,31 @@ public class WebSecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
+
         // Get allowed origins from application properties
         String allowedOriginsStr = env.getProperty("app.cors.allowed-origins");
-        if (allowedOriginsStr != null && !allowedOriginsStr.trim().isEmpty()) {
-            // If specific origins are configured, use them
-            configuration.setAllowedOrigins(Arrays.asList(allowedOriginsStr.split(",")));
-        } else {
-            // Otherwise allow all origins for maximum flexibility
-            configuration.addAllowedOrigin("*");
-        }
-        
+
+        // Set allowed methods and headers
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
         configuration.setExposedHeaders(Arrays.asList("Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"));
-        configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
-        
+
+        // Handle allowed origins
+        if (allowedOriginsStr != null && allowedOriginsStr.trim().equals("*")) {
+            // For wildcard origin, we can't use allowCredentials=true
+            configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+            configuration.setAllowCredentials(true);
+        } else if (allowedOriginsStr != null && !allowedOriginsStr.trim().isEmpty()) {
+            // If specific origins are configured, use them
+            configuration.setAllowedOrigins(Arrays.asList(allowedOriginsStr.split(",")));
+            configuration.setAllowCredentials(true);
+        } else {
+            // Default to allow all origins
+            configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+            configuration.setAllowCredentials(true);
+        }
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
@@ -145,7 +153,7 @@ public class WebSecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> 
+            .authorizeHttpRequests(auth ->
                 auth.requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers("/api/v1/test/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
@@ -174,13 +182,13 @@ public class WebSecurityConfig {
                 .successHandler(oAuth2AuthenticationSuccessHandler)
                 .failureHandler(oAuth2AuthenticationFailureHandler)
             );
-        
+
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
-        
+
         return http.build();
     }
-    
+
     /**
      * Configure the OAuth2 user service.
      *

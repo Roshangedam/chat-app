@@ -3,6 +3,7 @@ package com.chat.app.backend.config;
 import com.chat.app.backend.security.websocket.WebSocketAuthChannelInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
@@ -26,6 +27,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Autowired
     private WebSocketAuthChannelInterceptor webSocketAuthChannelInterceptor;
+
+    @Autowired
+    private Environment env;
 
     /**
      * Configure message broker options.
@@ -52,30 +56,52 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // Register the "/ws" endpoint, enabling SockJS fallback options
-        registry.addEndpoint("/ws")
-                .setAllowedOrigins("http://localhost:4200")
-                .withSockJS()
-                .setInterceptors(new HandshakeInterceptor() {
-                    @Override
-                    public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
-                                                  WebSocketHandler wsHandler, Map<String, Object> attributes) {
-                        // Extract token from URL query parameters
-                        if (request instanceof ServletServerHttpRequest) {
-                            ServletServerHttpRequest servletRequest = (ServletServerHttpRequest) request;
-                            String token = servletRequest.getServletRequest().getParameter("token");
-                            if (token != null) {
-                                attributes.put("token", token);
-                            }
-                        }
-                        return true;
-                    }
+        // Get allowed origins from application properties
+        String allowedOriginsStr = env.getProperty("app.cors.allowed-origins");
 
-                    @Override
-                    public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
-                                              WebSocketHandler wsHandler, Exception exception) {
-                        // No action needed after handshake
+        // Create the handshake interceptor
+        HandshakeInterceptor handshakeInterceptor = new HandshakeInterceptor() {
+            @Override
+            public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
+                                          WebSocketHandler wsHandler, Map<String, Object> attributes) {
+                // Extract token from URL query parameters
+                if (request instanceof ServletServerHttpRequest) {
+                    ServletServerHttpRequest servletRequest = (ServletServerHttpRequest) request;
+                    String token = servletRequest.getServletRequest().getParameter("token");
+                    if (token != null) {
+                        attributes.put("token", token);
                     }
-                });
+                }
+                return true;
+            }
+
+            @Override
+            public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
+                                      WebSocketHandler wsHandler, Exception exception) {
+                // No action needed after handshake
+            }
+        };
+
+        // Configure the endpoint
+        if (allowedOriginsStr != null && allowedOriginsStr.trim().equals("*")) {
+            // For wildcard origin, use allowedOriginPatterns instead of allowedOrigins
+            registry.addEndpoint("/ws")
+                    .setAllowedOriginPatterns("*")
+                    .withSockJS()
+                    .setInterceptors(handshakeInterceptor);
+        } else if (allowedOriginsStr != null && !allowedOriginsStr.trim().isEmpty()) {
+            // If specific origins are configured, use them
+            registry.addEndpoint("/ws")
+                    .setAllowedOrigins(allowedOriginsStr.split(","))
+                    .withSockJS()
+                    .setInterceptors(handshakeInterceptor);
+        } else {
+            // Default to allow all origins
+            registry.addEndpoint("/ws")
+                    .setAllowedOriginPatterns("*")
+                    .withSockJS()
+                    .setInterceptors(handshakeInterceptor);
+        }
     }
 
     /**

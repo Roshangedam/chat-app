@@ -17,6 +17,8 @@ import { DateFormatterUtils } from '../../utils/date-formatter.utils';
 import { User } from '../../../core/auth/services/auth.service';
 // Import the new chat service for future migration
 import { ChatService as NewChatService } from '../../../features/chat/api/services/chat.service';
+import { UserStatusService } from '../../../features/chat/api/services/user-status.service';
+import { StatusIndicatorComponent } from '../status-indicator/status-indicator.component';
 
 @Component({
   selector: 'app-list-view',
@@ -31,7 +33,8 @@ import { ChatService as NewChatService } from '../../../features/chat/api/servic
     MatFormFieldModule,
     MatDividerModule,
     MatBadgeModule,
-    MatTooltipModule
+    MatTooltipModule,
+    StatusIndicatorComponent
   ],
   templateUrl: './list-view.component.html',
   styleUrls: ['./list-view.component.css']
@@ -48,6 +51,7 @@ export class ListViewComponent implements OnInit, OnDestroy {
   constructor(
     private chatService: ChatService,
     private authService: AuthService,
+    private userStatusService: UserStatusService,
     public dateFormatter: DateFormatterUtils
   ) {}
 
@@ -63,6 +67,9 @@ export class ListViewComponent implements OnInit, OnDestroy {
 
     // Load conversations
     this.chatService.getConversations().subscribe();
+
+    // Subscribe to user status updates
+    this.userStatusService.subscribeToUserStatus();
 
     // For now, we'll use mock data for contacts
     this.loadMockContacts();
@@ -172,7 +179,31 @@ export class ListViewComponent implements OnInit, OnDestroy {
   }
 
   getUserStatus(user: User): string {
+    if (!user) return 'OFFLINE';
+
+    // First check if we have a real-time status from the UserStatusService
+    const realTimeStatus = this.userStatusService.getUserStatus(user.id);
+    if (realTimeStatus) {
+      return realTimeStatus;
+    }
+    // Fall back to the status stored in the user object
     return user.status || 'OFFLINE';
+  }
+
+  /**
+   * Get the other participant in a one-to-one conversation
+   * @param conversation The conversation
+   * @returns The other participant or null if not found
+   */
+  getOtherParticipant(conversation: any): User | null {
+    if (!conversation || conversation.groupChat || !conversation.participants) {
+      return null;
+    }
+
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser) return null;
+
+    return conversation.participants.find((p: any) => p.id !== currentUser.id) || null;
   }
 
   createNewGroup(): void {

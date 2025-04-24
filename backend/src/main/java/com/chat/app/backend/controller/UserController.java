@@ -5,6 +5,7 @@ import com.chat.app.backend.model.User;
 import com.chat.app.backend.model.UserStatus;
 import com.chat.app.backend.repository.UserRepository;
 import com.chat.app.backend.security.jwt.UserDetailsImpl;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,6 +27,9 @@ public class UserController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
     /**
      * Get all users except the current user.
      *
@@ -35,15 +39,15 @@ public class UserController {
     @GetMapping
     public ResponseEntity<List<UserDTO>> getAllUsers(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         Long currentUserId = userDetails.getId();
-        
+
         List<User> users = userRepository.findAll().stream()
                 .filter(user -> !user.getId().equals(currentUserId))
                 .collect(Collectors.toList());
-        
+
         List<UserDTO> userDTOs = users.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
-        
+
         return ResponseEntity.ok(userDTOs);
     }
 
@@ -56,11 +60,11 @@ public class UserController {
     @GetMapping("/{userId}")
     public ResponseEntity<UserDTO> getUserById(@PathVariable Long userId) {
         Optional<User> userOpt = userRepository.findById(userId);
-        
+
         if (userOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        
+
         UserDTO userDTO = convertToDTO(userOpt.get());
         return ResponseEntity.ok(userDTO);
     }
@@ -76,17 +80,17 @@ public class UserController {
     public ResponseEntity<List<UserDTO>> searchUsers(
             @RequestParam String query,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        
+
         Long currentUserId = userDetails.getId();
-        
+
         List<User> users = userRepository.findByUsernameContainingIgnoreCase(query).stream()
                 .filter(user -> !user.getId().equals(currentUserId))
                 .collect(Collectors.toList());
-        
+
         List<UserDTO> userDTOs = users.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
-        
+
         return ResponseEntity.ok(userDTOs);
     }
 
@@ -101,21 +105,30 @@ public class UserController {
     public ResponseEntity<UserDTO> updateStatus(
             @RequestBody StatusUpdateRequest status,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        
+
         Long userId = userDetails.getId();
         Optional<User> userOpt = userRepository.findById(userId);
-        
+
         if (userOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        
+
         User user = userOpt.get();
         user.setStatus(status.getStatus());
         user.setLastActive(LocalDateTime.now());
-        
+
         User savedUser = userRepository.save(user);
         UserDTO userDTO = convertToDTO(savedUser);
-        
+
+        // Broadcast status update to all connected clients
+        messagingTemplate.convertAndSend("/topic/user.status",
+            new com.chat.app.backend.dto.UserStatusDTO(
+                savedUser.getId(),
+                savedUser.getUsername(),
+                savedUser.getStatus()
+            )
+        );
+
         return ResponseEntity.ok(userDTO);
     }
 
@@ -137,7 +150,7 @@ public class UserController {
         dto.setLastActive(user.getLastActive());
         dto.setCreatedAt(user.getCreatedAt());
         dto.setUpdatedAt(user.getUpdatedAt());
-        
+
         return dto;
     }
 
@@ -154,5 +167,42 @@ public class UserController {
         public void setStatus(UserStatus status) {
             this.status = status;
         }
+    }
+
+    /**
+     * Set the current user's status to OFFLINE when logging out.
+     *
+     * @param userDetails the authenticated user details
+     * @return success message
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.badRequest().body("User not authenticated");
+        }
+
+        Long userId = userDetails.getId();
+        Optional<User> userOpt = userRepository.findById(userId);
+
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        User user = userOpt.get();
+        user.setStatus(UserStatus.OFFLINE);
+        user.setLastActive(LocalDateTime.now());
+
+        User savedUser = userRepository.save(user);
+
+        // Broadcast status update to all connected clients
+        messagingTemplate.convertAndSend("/topic/user.status",
+            new com.chat.app.backend.dto.UserStatusDTO(
+                savedUser.getId(),
+                savedUser.getUsername(),
+                UserStatus.OFFLINE
+            )
+        );
+
+        return ResponseEntity.ok().body("Logged out successfully");
     }
 }

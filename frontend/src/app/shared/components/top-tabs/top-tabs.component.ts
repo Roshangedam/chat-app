@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatIconModule } from '@angular/material/icon';
@@ -9,6 +9,9 @@ import { MatMenuModule } from '@angular/material/menu';
 import { Section } from '../../../features/chat/models/section.model';
 import { AuthService } from '../../../core/auth/services/auth.service';
 import { User } from '../../../core/auth/services/auth.service';
+import { UserStatusService } from '../../../features/chat/api/services/user-status.service';
+import { Subscription } from 'rxjs';
+import { StatusIndicatorComponent } from '../status-indicator/status-indicator.component';
 
 @Component({
   selector: 'app-top-tabs',
@@ -19,23 +22,40 @@ import { User } from '../../../core/auth/services/auth.service';
     MatIconModule,
     MatBadgeModule,
     MatButtonModule,
-    MatMenuModule
+    MatMenuModule,
+    StatusIndicatorComponent
   ],
   templateUrl: './top-tabs.component.html',
   styleUrls: ['./top-tabs.component.css']
 })
-export class TopTabsComponent {
+export class TopTabsComponent implements OnInit, OnDestroy {
   @Input() sections: Section[] = [];
   @Input() activeSection: string = '';
   @Output() sectionChange = new EventEmitter<string>();
 
   currentUser: User | null = null;
 
-  constructor(private authService: AuthService) {
+  private subscriptions = new Subscription();
+
+  constructor(
+    private authService: AuthService,
+    private userStatusService: UserStatusService
+  ) {
     // Subscribe to user changes
-    this.authService.currentUser$.subscribe(user => {
-      this.currentUser = user;
-    });
+    this.subscriptions.add(
+      this.authService.currentUser$.subscribe(user => {
+        this.currentUser = user;
+      })
+    );
+  }
+
+  ngOnInit(): void {
+    // Subscribe to user status updates
+    this.userStatusService.subscribeToUserStatus();
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
   }
 
   onTabChange(event: any): void {
@@ -49,5 +69,21 @@ export class TopTabsComponent {
 
   logout(): void {
     this.authService.logout();
+  }
+
+  /**
+   * Get the current user's status, prioritizing real-time status
+   */
+  getUserStatus(): string {
+    if (!this.currentUser) return 'OFFLINE';
+
+    // First check if we have a real-time status from the UserStatusService
+    const realTimeStatus = this.userStatusService.getUserStatus(this.currentUser.id);
+    if (realTimeStatus) {
+      return realTimeStatus;
+    }
+
+    // Fall back to the status stored in the user object
+    return this.currentUser.status || 'OFFLINE';
   }
 }

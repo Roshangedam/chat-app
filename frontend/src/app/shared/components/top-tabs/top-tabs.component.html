@@ -6,6 +6,7 @@
         alt="Profile Picture"
         class="profile-avatar"
       >
+      <app-status-indicator *ngIf="currentUser" [userId]="currentUser.id" size="small"></app-status-indicator>
     </div>
 
     <h2 class="app-title">Chat App</h2>
