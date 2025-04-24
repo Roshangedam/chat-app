@@ -39,11 +39,11 @@ services:
       - chat-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 || exit 0"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
 
   # Kafka Message Broker
   kafka:
