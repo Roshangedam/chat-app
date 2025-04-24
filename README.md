@@ -267,10 +267,14 @@ The frontend application can be configured by modifying the environment files in
 │   ├── /src/                     # Source code
 │   ├── /docker-entrypoint.sh     # Docker entry point script
 │   └── /Dockerfile               # Backend Docker configuration
+├── /docs/                        # Documentation
+│   ├── /setup/                   # Setup guides
+│   └── /deployment/              # Deployment guides
+├── /scripts/                     # Scripts
+│   ├── /local/                   # Scripts for local development
+│   └── /deployment/              # Scripts for deployment
 ├── /docker-compose.yml           # Docker Compose configuration
 ├── /.env                         # Environment variables (create this file)
-├── /restart.sh                   # Restart script for Linux/Mac
-├── /restart.ps1                  # Restart script for Windows
 └── /README.md                    # This file
 ```
 
@@ -291,12 +295,20 @@ This project is configured for CI/CD with GitHub Actions and deployment to Googl
 
 ### Setting Up SSH for GitHub Actions
 
-For the CI/CD pipeline to work correctly, you need to set up SSH authentication between GitHub Actions and your GCP VM. See the [SSH Setup Guide](SSH_SETUP_GUIDE.md) for detailed instructions on:
+For the CI/CD pipeline to work correctly, you need to set up SSH authentication between GitHub Actions and your GCP VM. See the [SSH Setup Guide](docs/setup/SSH_SETUP_GUIDE.md) for detailed instructions on:
 
 1. Generating SSH key pairs
 2. Adding the public key to your GCP VM
 3. Adding the private key to GitHub Secrets
 4. Troubleshooting SSH connection issues
+
+### Project Documentation
+
+For more detailed documentation, please refer to:
+
+- [Setup Documentation](docs/setup/README.md): Guides for setting up the development environment
+- [Deployment Documentation](docs/deployment/README.md): Information about deployment processes
+- [Scripts Documentation](scripts/README.md): Information about utility scripts
 
 ## License
 
