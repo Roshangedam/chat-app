@@ -41,6 +41,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.3.0
     container_name: chat-app-kafka
+    hostname: kafka
     depends_on:
       - zookeeper
     ports:
@@ -54,10 +55,17 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Add explicit host mapping
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
     volumes:
       - kafka-data:/var/lib/kafka/data
     networks:
       - chat-network
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Backend Spring Boot Application
   backend:
@@ -65,9 +73,12 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: chat-app-backend
+    hostname: backend
     depends_on:
-      - mysql
-      - kafka
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
@@ -80,8 +91,16 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       JWT_SECRET: ${JWT_SECRET}
+      # Add explicit host mapping for Kafka
+      KAFKA_HOST: kafka
     networks:
       - chat-network
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Frontend Angular Application
   frontend:
@@ -89,18 +108,24 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: chat-app-frontend
+    hostname: frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "80:80"
     environment:
       - API_URL=http://backend:8080
     networks:
       - chat-network
+    restart: on-failure
 
 networks:
   chat-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 
 volumes:
   mysql-data:

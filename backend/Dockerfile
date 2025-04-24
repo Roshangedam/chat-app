@@ -14,8 +14,8 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Install MySQL client for database initialization
-RUN apt-get update && apt-get install -y default-mysql-client && rm -rf /var/lib/apt/lists/*
+# Install MySQL client and netcat for database and Kafka connectivity checks
+RUN apt-get update && apt-get install -y default-mysql-client netcat-openbsd curl iputils-ping dnsutils && rm -rf /var/lib/apt/lists/*
 
 # Copy the built JAR file from the build stage
 COPY --from=build /app/target/*.jar app.jar
