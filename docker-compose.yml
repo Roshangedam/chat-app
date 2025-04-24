@@ -121,11 +121,11 @@ services:
       - chat-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health || exit 0"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 0"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
 
   # Frontend Angular Application
   frontend:
@@ -135,8 +135,7 @@ services:
     container_name: chat-app-frontend
     hostname: frontend
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     ports:
       - "80:80"
     environment:
