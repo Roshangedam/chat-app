@@ -37,7 +37,6 @@ Add the following secrets to your GitHub repository (Settings > Secrets and vari
 | Secret Name | Description | Example Value |
 |-------------|-------------|---------------|
 | `GCP_SSH_KEY` | Private SSH key for GCP VM access | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
-| `GCP_SSH_PUB_KEY` | Public SSH key for GCP VM access | `ssh-rsa AAAAB3NzaC1...` |
 | `GCP_HOST` | GCP VM host address | `35.123.456.789` |
 | `GCP_USER` | GCP VM username | `username` |
 

@@ -2,7 +2,7 @@
 spring:
   application:
     name: chat-app-backend
-  
+
   # Database Configuration
   datasource:
     url: jdbc:mysql://localhost:3306/chatapp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
@@ -11,7 +11,7 @@ spring:
     username: root
     password: roshan
     driver-class-name: com.mysql.cj.jdbc.Driver
-  
+
   # JPA Configuration
   jpa:
     hibernate:
@@ -21,7 +21,7 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
-  
+
   # Kafka Configuration
   kafka:
     bootstrap-servers: localhost:29092
@@ -35,14 +35,14 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: com.chat.app.backend.*
-  
+
   # Security Configuration
   security:
     oauth2:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID:xxx}
+            client-id: ${GOOGLE_CLIENT_ID:454760391847-png3sm0n5o2mruue4g9eid8m58h21ejl.apps.googleusercontent.com}
             client-secret: ${GOOGLE_CLIENT_SECRET:xxx}
             redirect-uri: "{baseUrl}/api/oauth2/callback/{registrationId}"
             scope:
@@ -86,6 +86,8 @@ spring:
       on-profile: docker
   datasource:
     url: jdbc:mysql://mysql:3306/chatapp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: rootpassword
   kafka:
     bootstrap-servers: kafka:9092
 
