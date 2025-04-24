@@ -24,11 +24,16 @@ jobs:
           echo "  StrictHostKeyChecking no" >> ~/.ssh/config
           echo "  UserKnownHostsFile=/dev/null" >> ~/.ssh/config
           echo "  IdentityFile ~/.ssh/id_rsa" >> ~/.ssh/config
+          echo "  PubkeyAcceptedKeyTypes +ssh-rsa" >> ~/.ssh/config
+          echo "  HostKeyAlgorithms +ssh-rsa" >> ~/.ssh/config
           # Verify SSH key format
           ssh-keygen -l -f ~/.ssh/id_rsa || echo "Invalid SSH key format"
           # Display debug info
           echo "Using identity file: ~/.ssh/id_rsa"
           echo "Connecting to: ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}"
+          # Display public key for verification
+          echo "Public key fingerprint:"
+          ssh-keygen -y -f ~/.ssh/id_rsa | ssh-keygen -E md5 -lf -
 
       - name: Clean old app on VM
         run: |
