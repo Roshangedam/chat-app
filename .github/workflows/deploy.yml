@@ -16,14 +16,19 @@ jobs:
       - name: Setup SSH for GCP VM
         run: |
           mkdir -p ~/.ssh
+          # Save the private key from GitHub secrets
           echo "${{ secrets.GCP_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           # Add host key checking
           echo "Host ${{ secrets.GCP_HOST }}" > ~/.ssh/config
           echo "  StrictHostKeyChecking no" >> ~/.ssh/config
           echo "  UserKnownHostsFile=/dev/null" >> ~/.ssh/config
+          echo "  IdentityFile ~/.ssh/id_rsa" >> ~/.ssh/config
           # Verify SSH key format
           ssh-keygen -l -f ~/.ssh/id_rsa || echo "Invalid SSH key format"
+          # Display debug info
+          echo "Using identity file: ~/.ssh/id_rsa"
+          echo "Connecting to: ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}"
 
       - name: Clean old app on VM
         run: |
