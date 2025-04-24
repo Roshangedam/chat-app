@@ -16,37 +16,45 @@ jobs:
       - name: Setup SSH for GCP VM
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.GCP_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          echo "${{ secrets.GCP_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
+          # Add host key checking
+          echo "Host ${{ secrets.GCP_HOST }}" > ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          echo "  UserKnownHostsFile=/dev/null" >> ~/.ssh/config
+          # Verify SSH key format
+          ssh-keygen -l -f ~/.ssh/id_rsa || echo "Invalid SSH key format"
 
       - name: Clean old app on VM
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "rm -rf ~/chat-app && mkdir ~/chat-app"
+          # Add debug information
+          echo "Connecting to ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}"
+          # Try SSH connection with verbose output
+          ssh -v -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} "rm -rf ~/chat-app && mkdir ~/chat-app"
 
       - name: Copy code to VM
         run: |
-          scp -r -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new ./* ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/chat-app
+          scp -v -r -i ~/.ssh/id_rsa ./* ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/chat-app
 
       - name: Run Docker Compose on VM
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
             cd ~/chat-app
             # Set environment variables for database connection and OAuth2
             export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
             export GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
             export GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-            
+
             # Clean up any existing containers and volumes
             docker-compose down -v
-            
+
             # Run docker-compose with environment variables
             docker-compose -f docker-compose.yml up -d
           EOF
 
       - name: Remove Frontend and Backend Docker Images
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
             cd ~/chat-app
             # Remove frontend and backend Docker images while keeping the containers running
             docker image rm -f chat-app_frontend chat-app_backend

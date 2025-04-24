@@ -289,6 +289,15 @@ This project is configured for CI/CD with GitHub Actions and deployment to Googl
 - `SPRING_DATASOURCE_PASSWORD`: Database password
 - `JWT_SECRET`: Secret for JWT token generation
 
+### Setting Up SSH for GitHub Actions
+
+For the CI/CD pipeline to work correctly, you need to set up SSH authentication between GitHub Actions and your GCP VM. See the [SSH Setup Guide](SSH_SETUP_GUIDE.md) for detailed instructions on:
+
+1. Generating SSH key pairs
+2. Adding the public key to your GCP VM
+3. Adding the private key to GitHub Secrets
+4. Troubleshooting SSH connection issues
+
 ## License
 
 [MIT License](LICENSE)
