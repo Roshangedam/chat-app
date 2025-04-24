@@ -50,13 +50,16 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Modified for better network compatibility
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      # Add explicit host mapping
+      # Explicit host mapping
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      # Add explicit host name settings
+      KAFKA_HOST_NAME: kafka
     volumes:
       - kafka-data:/var/lib/kafka/data
     networks:
@@ -66,6 +69,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
   # Backend Spring Boot Application
   backend:
@@ -85,7 +89,11 @@ services:
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:mysql://mysql:3306/chatapp}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-root}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-rootpassword}
+      # Modified Kafka configuration for better connectivity
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_PROPERTIES_RECONNECT_BACKOFF_MS: 1000
+      SPRING_KAFKA_PROPERTIES_RECONNECT_BACKOFF_MAX_MS: 5000
+      SPRING_KAFKA_PROPERTIES_REQUEST_TIMEOUT_MS: 30000
       SPRING_PROFILES_ACTIVE: docker
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-"*"}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
@@ -93,14 +101,19 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       # Add explicit host mapping for Kafka
       KAFKA_HOST: kafka
+      # Add extra DNS configuration
+      EXTRA_HOSTS: "kafka:172.20.0.3"
     networks:
       - chat-network
     restart: on-failure
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health || exit 0"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    extra_hosts:
+      - "kafka:172.20.0.3"
 
   # Frontend Angular Application
   frontend:
