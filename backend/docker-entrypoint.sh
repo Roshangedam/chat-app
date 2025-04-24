@@ -60,18 +60,26 @@ cat /etc/hosts
 # Try to connect to Kafka with timeout
 echo "Attempting to connect to Kafka at $KAFKA_HOST:$KAFKA_PORT..."
 RETRY_COUNT=0
-MAX_RETRIES=30
+MAX_RETRIES=10
 until nc -z $KAFKA_HOST $KAFKA_PORT > /dev/null 2>&1; do
   RETRY_COUNT=$((RETRY_COUNT+1))
   if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
     echo "Warning: Could not connect to Kafka after $MAX_RETRIES attempts, but will continue startup"
+    echo "The application will retry connecting to Kafka automatically"
     break
   fi
   echo "Kafka is unavailable (attempt $RETRY_COUNT/$MAX_RETRIES) - sleeping"
   sleep 2
 done
 
+# Add additional hosts to /etc/hosts if needed
+if [ -n "$EXTRA_HOSTS" ]; then
+  echo "Adding extra hosts from environment variable: $EXTRA_HOSTS"
+  echo "$EXTRA_HOSTS" >> /etc/hosts
+fi
+
 echo "Proceeding with application startup..."
+echo "Note: The application is configured to handle Kafka connectivity issues gracefully"
 
 # Start the application
 exec java -jar app.jar
