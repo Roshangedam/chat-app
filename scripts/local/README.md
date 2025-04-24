@@ -30,7 +30,7 @@ chmod +x restart.sh
 To test the SSH connection to your GCP VM:
 
 ```powershell
-.\test_ssh_connection.ps1
+.\test_gcp_connection.ps1
 ```
 
 This script will:

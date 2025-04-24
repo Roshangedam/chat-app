@@ -1,48 +1,52 @@
-# Updating GitHub Secrets for CI/CD
+# GitHub Secrets Configuration
 
-Follow these steps to update the SSH key in your GitHub repository secrets:
+This document outlines the GitHub Secrets that need to be configured for successful deployment of the Chat App.
 
-## 1. Copy Your Private SSH Key
+## Required GitHub Secrets
 
-Run the following command in PowerShell to display your private key:
+Add the following secrets to your GitHub repository (Settings > Secrets and variables > Actions > New repository secret):
 
-```powershell
-type C:\Users\rgedam\.ssh\gcp_deploy_key
-```
+### Database Configuration
 
-Copy the entire output, including the `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----` lines.
+| Secret Name | Description | Example Value |
+|-------------|-------------|---------------|
+| `MYSQL_DATABASE` | MySQL database name | `chatapp` |
+| `MYSQL_USER` | MySQL username | `chatuser` |
+| `MYSQL_PASSWORD` | MySQL user password | `chatpassword` |
+| `MYSQL_ROOT_PASSWORD` | MySQL root password | `rootpassword` |
+| `SPRING_DATASOURCE_URL` | JDBC URL for database connection | `jdbc:mysql://mysql:3306/chatapp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true` |
+| `SPRING_DATASOURCE_USERNAME` | Database username for Spring | `chatuser` |
+| `SPRING_DATASOURCE_PASSWORD` | Database password for Spring | `chatpassword` |
 
-## 2. Update GitHub Secrets
+### OAuth2 Configuration
 
-1. Go to your GitHub repository
-2. Click on "Settings" (tab at the top)
-3. In the left sidebar, click on "Secrets and variables" → "Actions"
-4. Find the `GCP_SSH_KEY` secret and click on "Update"
-5. Paste the entire private key content you copied in step 1
-6. Click "Update secret"
+| Secret Name | Description | Example Value |
+|-------------|-------------|---------------|
+| `GOOGLE_CLIENT_ID` | Google OAuth2 Client ID | `your-google-client-id` |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth2 Client Secret | `your-google-client-secret` |
 
-## 3. Verify Other Secrets
+### Security Configuration
 
-Make sure these other secrets are also set correctly:
+| Secret Name | Description | Example Value |
+|-------------|-------------|---------------|
+| `JWT_SECRET` | Secret key for JWT token generation | `your-jwt-secret-key` |
+| `CORS_ALLOWED_ORIGINS` | CORS allowed origins | `http://your-domain.com` |
 
-- `GCP_HOST`: `35.226.143.5` (your GCP VM IP address)
-- `GCP_USER`: `roshangedam1998` (your GCP VM username)
-- `MYSQL_ROOT_PASSWORD`: Your MySQL root password
-- `GOOGLE_CLIENT_ID`: Your Google OAuth client ID
-- `GOOGLE_CLIENT_SECRET`: Your Google OAuth client secret
+### GCP Deployment Configuration
 
-## 4. Trigger a New Workflow Run
+| Secret Name | Description | Example Value |
+|-------------|-------------|---------------|
+| `GCP_SSH_KEY` | Private SSH key for GCP VM access | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `GCP_HOST` | GCP VM host address | `35.123.456.789` |
+| `GCP_USER` | GCP VM username | `username` |
 
-After updating the secrets, trigger a new workflow run:
+## How These Secrets Are Used
 
-1. Make a small change to any file in your repository
-2. Commit and push the change to the `master` branch
-3. Go to the "Actions" tab in your GitHub repository to monitor the workflow run
+These secrets are used in the GitHub Actions workflow (`.github/workflows/deploy.yml`) to securely deploy the application to your Google Cloud Platform VM. The workflow:
 
-## 5. Troubleshooting
+1. Sets up SSH access to your GCP VM using the SSH keys
+2. Copies the application code to the VM
+3. Sets environment variables using the secrets
+4. Runs Docker Compose with these environment variables
 
-If you still encounter SSH issues:
-
-1. Check the workflow logs for detailed error messages
-2. Verify that the SSH key has been added to your GCP VM by running the `add_ssh_key_to_gcp.sh` script
-3. Test the SSH connection locally using the `test_ssh_connection.ps1` script
+This approach ensures that sensitive information is not hardcoded in your repository and can be easily updated without changing code.
