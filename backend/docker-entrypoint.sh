@@ -1,85 +1,64 @@
 #!/bin/sh
+set -e
 
-# Wait for MySQL to be ready
-echo "Waiting for MySQL..."
-sleep 10
+echo "=== Chat App Backend Startup ==="
 
-# Check if MySQL credentials are provided as environment variables, otherwise use defaults
-DB_HOST=${SPRING_DATASOURCE_URL:-jdbc:mysql://mysql:3306/chatapp}
-DB_USER=${SPRING_DATASOURCE_USERNAME:-chatuser}
-DB_PASSWORD=${SPRING_DATASOURCE_PASSWORD:-chatpassword}
+# Extract database connection details from JDBC URL
+echo "Parsing database connection details..."
+DB_URL=${SPRING_DATASOURCE_URL:-jdbc:mysql://mysql:3306/chatapp}
+DB_USER=${SPRING_DATASOURCE_USERNAME:-root}
+DB_PASSWORD=${SPRING_DATASOURCE_PASSWORD:-rootpassword}
 
 # Extract host and port from JDBC URL
-HOST=$(echo $DB_HOST | sed -E 's/.*mysql:\/\/([^:]+):.*/\1/')
-PORT=$(echo $DB_HOST | sed -E 's/.*:([0-9]+).*/\1/')
+DB_HOST=$(echo $DB_URL | sed -E 's/.*mysql:\/\/([^:\/]+).*/\1/')
+DB_PORT=$(echo $DB_URL | sed -E 's/.*:([0-9]+).*/\1/')
+DB_NAME=$(echo $DB_URL | sed -E 's/.*\/([^?]+).*/\1/')
 
-# Wait for MySQL to be available
+echo "Database connection: Host=$DB_HOST, Port=$DB_PORT, Database=$DB_NAME"
+
+# Wait for MySQL to be available with timeout
 echo "Checking MySQL connection..."
-until mysql -h"$HOST" -P"$PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1; do
-  echo "MySQL is unavailable - sleeping"
-  sleep 2
-done
-
-echo "MySQL is up - executing initialization script"
-
-# Run the initialization script
-mysql -h"$HOST" -P"$PORT" -u"$DB_USER" -p"$DB_PASSWORD" < /app/db/init.sql
-
-# Wait for Kafka to be ready
-echo "Waiting for Kafka..."
-KAFKA_HOST=${KAFKA_HOST:-kafka}
-KAFKA_PORT=9092
-
-# Try to ping Kafka
-echo "Checking Kafka connection..."
-echo "Attempting to resolve Kafka host: $KAFKA_HOST"
-getent hosts $KAFKA_HOST || echo "DNS resolution failed for $KAFKA_HOST"
-
-# Try multiple ways to get Kafka IP
-KAFKA_IP=$(getent hosts $KAFKA_HOST | awk '{ print $1 }')
-if [ -z "$KAFKA_IP" ]; then
-  echo "Trying to resolve Kafka IP through Docker network..."
-  # Try to get IP from Docker DNS
-  KAFKA_IP=$(dig +short $KAFKA_HOST || echo "")
-fi
-
-if [ -n "$KAFKA_IP" ]; then
-  echo "Found Kafka IP: $KAFKA_IP"
-else
-  echo "Warning: Could not resolve Kafka IP, will use hostname"
-fi
-
-# Add hosts entry for Kafka (in case DNS resolution fails)
-echo "Setting up /etc/hosts file..."
-echo "127.0.0.1 localhost" > /etc/hosts
-if [ -n "$KAFKA_IP" ]; then
-  echo "$KAFKA_IP $KAFKA_HOST" >> /etc/hosts
-fi
-cat /etc/hosts
-
-# Try to connect to Kafka with timeout
-echo "Attempting to connect to Kafka at $KAFKA_HOST:$KAFKA_PORT..."
 RETRY_COUNT=0
-MAX_RETRIES=10
-until nc -z $KAFKA_HOST $KAFKA_PORT > /dev/null 2>&1; do
+MAX_RETRIES=15
+
+until mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1; do
   RETRY_COUNT=$((RETRY_COUNT+1))
   if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-    echo "Warning: Could not connect to Kafka after $MAX_RETRIES attempts, but will continue startup"
-    echo "The application will retry connecting to Kafka automatically"
+    echo "Warning: Could not connect to MySQL after $MAX_RETRIES attempts, but will continue startup"
     break
   fi
-  echo "Kafka is unavailable (attempt $RETRY_COUNT/$MAX_RETRIES) - sleeping"
+  echo "MySQL is unavailable (attempt $RETRY_COUNT/$MAX_RETRIES) - sleeping"
   sleep 2
 done
 
-# Add additional hosts to /etc/hosts if needed
-if [ -n "$EXTRA_HOSTS" ]; then
-  echo "Adding extra hosts from environment variable: $EXTRA_HOSTS"
-  echo "$EXTRA_HOSTS" >> /etc/hosts
+if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+  echo "MySQL is up - executing initialization script"
+  # Run the initialization script if it exists
+  if [ -f /app/db/init.sql ]; then
+    mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" < /app/db/init.sql
+  else
+    echo "No initialization script found, skipping"
+  fi
 fi
 
-echo "Proceeding with application startup..."
+# Basic network configuration to help with service discovery
+echo "Setting up network configuration..."
+echo "127.0.0.1 localhost $(hostname)" > /etc/hosts
+
+# Add Kafka host entry
+KAFKA_HOST=${SPRING_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+KAFKA_HOST=$(echo $KAFKA_HOST | sed -E 's/(.+):.*/\1/')
+echo "Adding Kafka host entry: $KAFKA_HOST"
+getent hosts $KAFKA_HOST || echo "Note: DNS resolution for $KAFKA_HOST will be handled by Docker"
+
+# Display network information for debugging
+echo "Network configuration:"
+ip addr show
+echo "DNS configuration:"
+cat /etc/resolv.conf
+
+echo "Starting Spring Boot application..."
 echo "Note: The application is configured to handle Kafka connectivity issues gracefully"
 
-# Start the application
-exec java -jar app.jar
+# Start the application with appropriate JVM options
+exec java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -jar app.jar

@@ -25,6 +25,8 @@ Before running the application, make sure you have the following installed on yo
 
 ## Running the Application with Docker Compose
 
+The Docker Compose configuration has been optimized to work reliably in both local development and GCP VM environments. It includes robust service configurations, proper health checks, and network settings that ensure services can communicate properly.
+
 ### 1. Clone the repository (if not already done)
 
 ```bash
@@ -80,6 +82,19 @@ This command will:
 - Start all required services (MySQL, Zookeeper, Kafka, backend, frontend)
 - Set up the necessary networks and volumes
 
+### Docker Compose Configuration Details
+
+Our Docker Compose setup includes several optimizations for reliability:
+
+1. **Service Dependencies**: Services wait for their dependencies to be healthy before starting
+2. **Health Checks**: All services have appropriate health checks to verify they're running correctly
+3. **Network Configuration**: Simplified network setup that works in both local and cloud environments
+4. **Kafka Configuration**: Optimized Kafka settings to ensure reliable message delivery
+5. **Restart Policies**: All services use `unless-stopped` to automatically recover from failures
+6. **Environment Variables**: Sensible defaults with the ability to override via environment variables
+
+This configuration is designed to be robust in both development and production environments, with special attention to Kafka connectivity issues that can occur in cloud deployments.
+
 ### 4. Check container status
 
 ```bash
@@ -133,6 +148,8 @@ docker-compose down -v --rmi all
 
 ### 8. Troubleshooting
 
+#### Database Connection Issues
+
 If you encounter database connection issues:
 
 ```bash
@@ -152,7 +169,37 @@ mysql> GRANT ALL PRIVILEGES ON chatapp.* TO 'root'@'%' IDENTIFIED BY 'rootpasswo
 mysql> FLUSH PRIVILEGES;
 ```
 
-For other services:
+#### Kafka Connectivity Issues
+
+If you encounter Kafka connectivity issues, especially in GCP VM environments:
+
+```bash
+# Check Kafka and Zookeeper status
+docker-compose ps kafka zookeeper
+
+# Check Kafka logs
+docker-compose logs kafka
+
+# Verify Kafka is accessible from the backend container
+docker-compose exec backend ping -c 4 kafka
+docker-compose exec backend nc -zv kafka 9092
+
+# Check DNS resolution inside the backend container
+docker-compose exec backend nslookup kafka
+docker-compose exec backend cat /etc/hosts
+
+# Restart Kafka and dependent services
+docker-compose restart zookeeper kafka
+docker-compose restart backend
+```
+
+The optimized Docker Compose configuration includes settings to handle Kafka connectivity issues that can occur in cloud environments. If you still encounter issues:
+
+1. Make sure the backend container can resolve the Kafka hostname
+2. Verify that Kafka is properly configured with the correct listener settings
+3. Check that the network configuration allows communication between services
+
+#### For Other Services
 
 ```bash
 # Check container logs
@@ -163,6 +210,9 @@ docker-compose restart [service_name]
 
 # Rebuild a specific service
 docker-compose up -d --build [service_name]
+
+# Check container health
+docker inspect --format "{{json .State.Health }}" chat-app-[service_name] | jq
 ```
 
 ## Running for Development
