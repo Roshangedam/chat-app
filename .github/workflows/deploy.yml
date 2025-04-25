@@ -60,5 +60,5 @@ jobs:
           ssh -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
             cd ~/chat-app
             # Remove frontend and backend Docker images while keeping the containers running
-            docker image rm -f chat-app_frontend chat-app_backend
+            docker image rm -f chat-app-frontend chat-app-backend
           EOF
