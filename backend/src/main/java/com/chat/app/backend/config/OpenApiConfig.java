@@ -36,7 +36,7 @@ import io.swagger.v3.oas.annotations.servers.Server;
                 ),
                 @Server(
                         description = "PROD ENV",
-                        url = "https://chat-app.com/api"
+                        url = "https://chat-app.ddns.net/api"
                 )
         },
         security = {
