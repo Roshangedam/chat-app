@@ -32,7 +32,7 @@ import java.util.Set;
 @Component
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    @Value("${app.cors.allowed-origins}")
+    @Value("${app.frontend-url}")
     private String frontendUrl;
 
     @Autowired
@@ -64,10 +64,19 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String token = jwtUtils.generateJwtToken(user);
 
         // Redirect to frontend with token
-        String redirectUrl = UriComponentsBuilder.fromUriString(frontendUrl)
-                .path("/oauth2/redirect")
-                .queryParam("token", token)
-                .build().toUriString();
+        String redirectUrl;
+        if ("*".equals(frontendUrl)) {
+            // If wildcard is used, default to localhost:4200 for development
+            redirectUrl = UriComponentsBuilder.fromUriString("http://localhost:4200")
+                    .path("/oauth2/redirect")
+                    .queryParam("token", token)
+                    .build().toUriString();
+        } else {
+            redirectUrl = UriComponentsBuilder.fromUriString(frontendUrl)
+                    .path("/oauth2/redirect")
+                    .queryParam("token", token)
+                    .build().toUriString();
+        }
 
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }

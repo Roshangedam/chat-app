@@ -20,7 +20,6 @@ import java.util.Map;
 /**
  * Controller for OAuth2 related endpoints.
  */
-@CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/v1/oauth2")
 public class OAuth2Controller {
@@ -39,26 +38,26 @@ public class OAuth2Controller {
      * @param request the OAuth2 callback request containing code and state
      * @return JWT response with token and user details
      */
-    @PostMapping("/callback")
+    @PostMapping("/callback/google")
     public ResponseEntity<?> handleOAuth2Callback(@RequestBody OAuth2CallbackRequest request) {
         logger.debug("Received OAuth2 callback with code: {} and state: {}", request.getCode(), request.getState());
-        
+
         try {
             // This endpoint is called by the frontend when it receives the code and state
             // from the OAuth2 provider.
-            
+
             // In a real implementation, we would use the OAuth2 client to exchange the code
             // for an access token and then get the user info. For now, we'll use the state
             // parameter to identify the provider.
-            
+
             String provider = "google"; // Default to Google as the provider
             String providerId = request.getCode(); // Use code as provider ID for now
-            
+
             // Try to find user by email from state (if available)
             // In a real implementation, we would decode the state parameter or use a session
             String email = null;
             String name = null;
-            
+
             // For demonstration, extract email from state if it's in email format
             if (request.getState() != null && request.getState().contains("@")) {
                 email = request.getState();
@@ -68,15 +67,15 @@ public class OAuth2Controller {
                 email = "user" + System.currentTimeMillis() + "@example.com";
                 name = "OAuth User";
             }
-            
+
             // Find or create user
             User user = null;
-            
+
             // Try to find by email first
             if (email != null) {
                 user = userService.findByEmail(email);
             }
-            
+
             if (user == null) {
                 // Create a new user
                 user = new User();
@@ -86,7 +85,7 @@ public class OAuth2Controller {
                 user.setProvider(provider);
                 user.setProviderId(providerId);
                 user.setPassword(""); // No password for OAuth2 users
-                
+
                 // Save the user
                 user = userService.saveUser(user);
             } else {
@@ -97,11 +96,11 @@ public class OAuth2Controller {
                     user = userService.saveUser(user);
                 }
             }
-            
+
             // Generate JWT tokens
             String accessToken = jwtUtils.generateJwtToken(user);
             String refreshToken = jwtUtils.generateRefreshToken(user);
-            
+
             JwtResponse response = new JwtResponse(
                     accessToken,
                     refreshToken,
@@ -111,7 +110,7 @@ public class OAuth2Controller {
                     user.getUsername(),
                     user.getFullName()
             );
-            
+
             logger.info("Successfully processed OAuth2 callback for user: {}", user.getUsername());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -132,7 +131,7 @@ public class OAuth2Controller {
     @PostMapping("/verify-token")
     public ResponseEntity<?> verifyToken(@RequestBody TokenVerificationRequest request) {
         logger.debug("Verifying token: {}", request.getToken().substring(0, Math.min(10, request.getToken().length())) + "...");
-        
+
         try {
             // First, validate the token format and signature
             if (!jwtUtils.validateJwtToken(request.getToken())) {
@@ -142,19 +141,19 @@ public class OAuth2Controller {
                 errorResponse.put("message", "Invalid token format or signature");
                 return ResponseEntity.badRequest().body(errorResponse);
             }
-            
+
             // Extract username from token
             String username = jwtUtils.getUserNameFromJwtToken(request.getToken());
-            
+
             if (username != null) {
                 // Get user details
                 User user = userService.findByUsername(username);
-                
+
                 if (user != null) {
                     // Generate a new token pair
                     String accessToken = jwtUtils.generateJwtToken(user);
                     String refreshToken = jwtUtils.generateRefreshToken(user);
-                    
+
                     logger.info("Successfully verified token for user: {}", username);
                     return ResponseEntity.ok(new JwtResponse(
                             accessToken,
@@ -187,7 +186,7 @@ public class OAuth2Controller {
             return ResponseEntity.badRequest().body(errorResponse);
         }
     }
-    
+
     /**
      * Refresh access token using refresh token for OAuth2 users.
      *
@@ -197,20 +196,20 @@ public class OAuth2Controller {
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
         logger.debug("Received OAuth2 refresh token request");
-        
+
         try {
             // Validate refresh token and extract username
             String username = jwtUtils.getUserNameFromJwtToken(refreshTokenRequest.getRefreshToken());
-            
+
             if (username != null) {
                 // Get user details
                 User user = userService.findByUsername(username);
-                
+
                 if (user != null) {
                     // Generate a new token pair
                     String accessToken = jwtUtils.generateJwtToken(user);
                     String refreshToken = jwtUtils.generateRefreshToken(user);
-                    
+
                     logger.info("Successfully refreshed token for OAuth2 user: {}", username);
                     return ResponseEntity.ok(new JwtResponse(
                             accessToken,
@@ -227,7 +226,7 @@ public class OAuth2Controller {
             } else {
                 logger.warn("Invalid refresh token provided");
             }
-            
+
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("message", "Invalid refresh token");

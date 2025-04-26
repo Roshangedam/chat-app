@@ -6,8 +6,6 @@ spring:
   # Database Configuration
   datasource:
     url: jdbc:mysql://localhost:3306/chatapp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-#    username: chatuser
-#    password: chatpassword
     username: root
     password: roshan
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -42,9 +40,9 @@ spring:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID:454760391847-png3sm0n5o2mruue4g9eid8m58h21ejl.apps.googleusercontent.com}
-            client-secret: ${GOOGLE_CLIENT_SECRET:xxx}
-            redirect-uri: "{baseUrl}/api/v1/oauth2/callback/{registrationId}"
+            client-id: ${GOOGLE_CLIENT_ID:your-clinet-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-client-secret}
+            redirect-uri: "{baseUrl}/api/v1/oauth2/callback/google"
             scope:
               - email
               - profile
@@ -66,17 +64,21 @@ logging:
   level:
     root: INFO
     com.chat.app: DEBUG
+    com.chat.app.backend.security: DEBUG
+    com.chat.app.backend.security.jwt: DEBUG
     org.springframework.web: INFO
-    org.springframework.security: INFO
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: DEBUG
     org.springframework.kafka: INFO
 
 # Custom Application Properties
 app:
+  frontend-url: ${FRONTEND_URL:http://localhost:4200}
   jwt:
     secret: ${JWT_SECRET:verySecretKeyThatShouldBeChangedInProduction}
     expiration-ms: 86400000 # 24 hours
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
 # Profile-specific configurations
 ---
@@ -90,7 +92,3 @@ spring:
     password: rootpassword
   kafka:
     bootstrap-servers: kafka:9092
-
-app:
-  cors:
-    allowed-origins: http://frontend:4200

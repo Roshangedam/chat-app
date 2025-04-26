@@ -18,7 +18,6 @@ import java.util.Map;
 /**
  * Controller for authentication endpoints.
  */
-@CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -58,11 +57,11 @@ public class AuthController {
      */
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signupRequest) {
-        logger.debug("Received registration request for username: {} and email: {}", 
+        logger.debug("Received registration request for username: {} and email: {}",
                 signupRequest.getUsername(), signupRequest.getEmail());
-        
+
         Map<String, Object> response = new HashMap<>();
-        
+
         try {
             // Check if registration is successful
             if (authService.registerUser(signupRequest)) {
@@ -71,7 +70,7 @@ public class AuthController {
                 response.put("message", "User registered successfully!");
                 return ResponseEntity.ok(response);
             } else {
-                logger.warn("Registration failed: Username or email already exists: {}, {}", 
+                logger.warn("Registration failed: Username or email already exists: {}, {}",
                         signupRequest.getUsername(), signupRequest.getEmail());
                 response.put("success", false);
                 response.put("message", "Username or email is already taken!");
@@ -84,7 +83,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body(response);
         }
     }
-    
+
     /**
      * Refresh access token using refresh token.
      *
@@ -94,7 +93,7 @@ public class AuthController {
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
         logger.debug("Received refresh token request");
-        
+
         try {
             JwtResponse jwtResponse = authService.refreshToken(refreshTokenRequest.getRefreshToken());
             logger.info("Token refreshed successfully");

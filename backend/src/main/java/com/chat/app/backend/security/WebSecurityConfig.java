@@ -155,7 +155,7 @@ public class WebSecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth ->
                 auth.requestMatchers("/api/v1/auth/**").permitAll()
-                    .requestMatchers("/api/v1/test/**").permitAll()
+                    .requestMatchers("/api/v1/test/public").permitAll() // Only public test endpoint is accessible without auth
                     .requestMatchers("/ws/**").permitAll()
                     .requestMatchers("/api/v1/oauth2/**").permitAll()
                     .requestMatchers("/api/v1/logs/**").permitAll()

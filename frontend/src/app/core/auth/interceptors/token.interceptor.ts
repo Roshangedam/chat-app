@@ -19,6 +19,8 @@ export const TokenInterceptor: HttpInterceptorFn = (request: HttpRequest<unknown
   const platformId = inject(PLATFORM_ID);
   const isBrowser = isPlatformBrowser(platformId);
 
+  console.log(`TokenInterceptor: Processing request to ${request.url}`);
+
   // Skip token for auth endpoints and logging endpoints
   if (request.url.includes('/auth/login') ||
       request.url.includes('/auth/signin') ||
@@ -29,19 +31,31 @@ export const TokenInterceptor: HttpInterceptorFn = (request: HttpRequest<unknown
       request.url.includes('/oauth2/callback') ||
       request.url.includes('/oauth2/verify-token') ||
       // Skip token for logging endpoints to avoid circular dependency with LoggingService
-      (environment.log?.apiUrl && request.url.includes(environment.log.apiUrl))) {
+      (environment.log?.apiUrl && request.url.includes('/api/v1/logs/'))) {
+    console.log(`TokenInterceptor: Skipping token for auth/log endpoint: ${request.url}`);
     return next(request);
   }
 
   // Skip token handling on server-side
   if (!isBrowser) {
+    console.log(`TokenInterceptor: Skipping token for server-side rendering`);
     return next(request);
   }
 
   // Add token to request
-  const token = authService.getToken();
+  // Try getting token directly from localStorage first as a fallback
+  let token = authService.getToken();
+  if (!token) {
+    token = localStorage.getItem('token');
+    console.log(`TokenInterceptor: Got token directly from localStorage: ${!!token}`);
+  }
+
+  console.log(`TokenInterceptor: Request to ${request.url}, token exists: ${!!token}`);
   if (token) {
     request = addToken(request, token);
+    console.log(`TokenInterceptor: Added token to request for ${request.url}`);
+  } else {
+    console.warn(`TokenInterceptor: No token available for request to ${request.url}`);
   }
 
   return next(request).pipe(

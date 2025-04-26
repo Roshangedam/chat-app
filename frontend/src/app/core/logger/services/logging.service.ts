@@ -154,8 +154,7 @@ export class LoggingService {
         // Use XMLHttpRequest directly to avoid going through interceptors
         // This breaks the circular dependency with AuthService
         const xhr = new XMLHttpRequest();
-        console.log('calling--' + `${environment.log.apiUrl}/v1/logs/log`)
-        xhr.open('POST', `${environment.log.apiUrl}/v1/logs/log`, true);
+        xhr.open('POST', `${environment.log.apiUrl}/api/v1/logs/log`, true);
         xhr.setRequestHeader('Content-Type', 'application/json');
 
         // Add CORS headers if needed

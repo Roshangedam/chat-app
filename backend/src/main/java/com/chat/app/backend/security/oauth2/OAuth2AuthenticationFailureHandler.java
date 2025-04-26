@@ -25,12 +25,21 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                                         AuthenticationException exception) throws IOException, ServletException {
-        
+
         // Redirect to frontend with error message
-        String redirectUrl = UriComponentsBuilder.fromUriString(frontendUrl)
-                .path("/oauth2/redirect")
-                .queryParam("error", exception.getLocalizedMessage())
-                .build().toUriString();
+        String redirectUrl;
+        if ("*".equals(frontendUrl)) {
+            // If wildcard is used, default to localhost:4200 for development
+            redirectUrl = UriComponentsBuilder.fromUriString("http://localhost:4200")
+                    .path("/oauth2/redirect")
+                    .queryParam("error", exception.getLocalizedMessage())
+                    .build().toUriString();
+        } else {
+            redirectUrl = UriComponentsBuilder.fromUriString(frontendUrl)
+                    .path("/oauth2/redirect")
+                    .queryParam("error", exception.getLocalizedMessage())
+                    .build().toUriString();
+        }
 
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }

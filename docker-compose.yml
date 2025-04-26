@@ -111,6 +111,7 @@ services:
       # Application profile
       SPRING_PROFILES_ACTIVE: docker
       # OAuth and security
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}

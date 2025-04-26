@@ -129,7 +129,7 @@ export class AuthService {
   // Handle OAuth2 callback
   handleOAuth2Callback(code: string, state: string): Observable<AuthResponse> {
     this.loggingService.logInfo('Processing OAuth2 callback');
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/api/v1/oauth2/callback`, { code, state })
+    return this.http.post<AuthResponse>(`${environment.apiUrl}/api/v1/oauth2/callback/google`, { code, state })
       .pipe(
         tap(response => {
           // this.loggingService.logInfo(`OAuth2 authentication successful for user: ${response.user.username}`);
@@ -373,6 +373,7 @@ export class AuthService {
   // Get JWT token
   getToken(): string | null {
     if (!this.isBrowser) {
+      console.log('getToken: Not in browser environment');
       return null;
     }
 
@@ -380,20 +381,29 @@ export class AuthService {
       const token = localStorage.getItem('token');
       const tokenExpiration = localStorage.getItem('tokenExpiration');
 
+      console.log(`getToken: Token exists: ${!!token}, expiration exists: ${!!tokenExpiration}`);
+
       // Validate token exists and is not empty
       if (!token || token.trim() === '') {
+        console.warn('getToken: No valid token found in storage');
         this.loggingService.logDebug('No valid token found in storage');
         return null;
       }
 
       // Check if token is expired based on stored expiration
       if (tokenExpiration && new Date(tokenExpiration) <= new Date()) {
+        console.warn(`getToken: Token has expired. Expiration: ${tokenExpiration}, Current: ${new Date().toISOString()}`);
         this.loggingService.logDebug('Token has expired, returning null');
         return null;
       }
 
+      // Log token format for debugging
+      const tokenParts = token.split('.');
+      console.log(`getToken: Token format valid: ${tokenParts.length === 3}, parts: ${tokenParts.length}`);
+
       return token;
     } catch (error) {
+      console.error('getToken: Error retrieving token', error);
       this.loggingService.logError('Error retrieving token', error);
       return null;
     }
@@ -411,6 +421,8 @@ export class AuthService {
 
   // Handle authentication response
   private handleAuthentication(response: any): void {
+    console.log('Handling authentication response:', response);
+
     // Map backend response fields to frontend interface
     // Prioritize token fields and handle different response formats
     let accessToken = response.accessToken || response.token || '';
@@ -435,30 +447,39 @@ export class AuthService {
 
     // Validate token before proceeding
     if (!accessToken) {
+      console.error('Authentication failed: No access token received');
       this.loggingService.logError('Authentication failed: No access token received');
       return;
     }
 
+    console.log(`Token before processing: ${accessToken.substring(0, 10)}...`);
+
     // Validate token format (JWT tokens should have 2 periods)
     if (!accessToken.includes('.')) {
+      console.warn('Token format validation failed - token does not contain periods');
       this.loggingService.logWarning('Token format validation failed - token does not contain periods');
       // If token doesn't have the expected format, try to decode it (it might be encoded)
       try {
         // It might be URL encoded or otherwise transformed
         const decodedToken = decodeURIComponent(accessToken);
         if (decodedToken.includes('.')) {
+          console.log('Successfully decoded token to proper JWT format');
           this.loggingService.logInfo('Successfully decoded token to proper JWT format');
           accessToken = decodedToken;
         }
       } catch (e) {
+        console.error('Failed to decode potentially encoded token', e);
         this.loggingService.logError('Failed to decode potentially encoded token', e);
       }
     }
 
     // Final validation - token should have 2 periods for JWT format
     if (accessToken.split('.').length !== 3) {
+      console.warn(`Token format may be invalid: contains ${accessToken.split('.').length - 1} periods instead of 2`);
       this.loggingService.logWarning(`Token format may be invalid: contains ${accessToken.split('.').length - 1} periods instead of 2`);
     }
+
+    console.log(`Token after processing: ${accessToken.substring(0, 10)}...`);
 
     // Calculate token expiration - add a small buffer to ensure we refresh before actual expiry
     const expirationDate = new Date(new Date().getTime() + (expiresIn * 1000) - 10000);
@@ -470,6 +491,14 @@ export class AuthService {
     // Store auth data in local storage (browser only)
     if (this.isBrowser) {
       try {
+        // Clear any existing tokens first
+        localStorage.removeItem('userData');
+        localStorage.removeItem('token');
+        localStorage.removeItem('tokenExpiration');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('isOAuth2User');
+
+        // Now set the new values
         localStorage.setItem('userData', JSON.stringify(user));
         localStorage.setItem('token', accessToken);
         localStorage.setItem('tokenExpiration', expirationDate.toISOString());
@@ -480,8 +509,14 @@ export class AuthService {
           localStorage.setItem('refreshToken', refreshToken);
         }
 
+        console.log('Authentication data stored successfully:', {
+          token: accessToken ? `${accessToken.substring(0, 10)}...` : null,
+          expiration: expirationDate.toISOString(),
+          user: user.username
+        });
         this.loggingService.logDebug('Authentication data stored successfully');
       } catch (error) {
+        console.error('Error storing authentication data', error);
         this.loggingService.logError('Error storing authentication data', error);
       }
     }
