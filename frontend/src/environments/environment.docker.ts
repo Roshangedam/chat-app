@@ -5,7 +5,7 @@ export const environment = {
   apiUrl: '/api', // This will use relative path with nginx proxy
   wsUrl: '/ws',  // This will use relative path with nginx proxy
   log: {
-    apiUrl: '/api/v1/logs',
+    apiUrl: '/api',
     logLevel: 'ROOT', // Available levels: 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'ROOT'
     enableSendApiLog: true, // Enable or disable send logging to api
     enableConsoleLog: true // Enable or disable console logging

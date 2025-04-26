@@ -154,21 +154,30 @@ export class LoggingService {
         // Use XMLHttpRequest directly to avoid going through interceptors
         // This breaks the circular dependency with AuthService
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${environment.log.apiUrl}/log`, true);
+        console.log('calling--' + `${environment.log.apiUrl}/v1/logs/log`)
+        xhr.open('POST', `${environment.log.apiUrl}/v1/logs/log`, true);
         xhr.setRequestHeader('Content-Type', 'application/json');
+
+        // Add CORS headers if needed
+        xhr.withCredentials = false;
+
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             if (environment.log.enableConsoleLog) {
               console.debug('Log sent to server successfully');
             }
           } else {
-            console.error('Failed to send log to server:', xhr.statusText);
+            console.error('Failed to send log to server:', xhr.status, xhr.statusText);
           }
         };
         xhr.onerror = () => {
           console.error('Failed to send log to server: Network error');
         };
-        xhr.send(JSON.stringify(logData));
+
+        // Ensure the data is properly formatted as JSON
+        const jsonData = JSON.stringify(logData);
+        // console.debug('Sending log data:', jsonData);
+        xhr.send(jsonData);
       } catch (error) {
         console.error('Failed to send log to server:', error);
       }

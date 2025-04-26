@@ -6,7 +6,7 @@ export const environment = {
   apiUrl: 'http://localhost:8080',
   wsUrl: 'http://localhost:8080/ws',
   log: {
-    apiUrl: 'http://localhost:8080/api/v1/logs',
+    apiUrl: 'http://localhost:8080',
     logLevel: 'ROOT', // Available levels: 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'ROOT'
     enableSendApiLog: true, // Enable or disable send logging to api
     enableConsoleLog: true // Enable or disable console logging

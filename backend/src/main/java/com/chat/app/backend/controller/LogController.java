@@ -2,7 +2,6 @@ package com.chat.app.backend.controller;
 
 
 import com.chat.app.backend.dto.log.LogRequest;
-import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +25,7 @@ public class LogController {
      * @return success message if log pushed successful, error message otherwise
      */
     @PostMapping("/log")
-    public ResponseEntity<?> apiLogs(@Valid @RequestBody LogRequest logRequest) {
+    public ResponseEntity<?> apiLogs(@RequestBody LogRequest logRequest) {
         logger.info("frontend log request {} ",logRequest);
         return ResponseEntity.ok("success");
     }
