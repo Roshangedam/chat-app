@@ -50,7 +50,7 @@ export class ChatService implements OnDestroy {
   ) {
     // Set up connection status observable
     this.connectionStatus$ = this.websocketService.connectionStatus$;
-    
+
     // Set up message status observable
     this.messageStatus$ = this.websocketService.messageStatus$;
 
@@ -202,14 +202,45 @@ export class ChatService implements OnDestroy {
     this.subscriptions.add(
       this.websocketService.typingStatus$.subscribe(typingUpdate => {
         this.ngZone.run(() => {
-          const typingUsers = new Map(this.typingUsersSubject.value);
+          console.log(`ChatService: Received typing update for ${typingUpdate.username}: ${typingUpdate.isTyping ? 'typing' : 'stopped typing'}`);
 
-          if (typingUpdate.isTyping) {
-            typingUsers.set(String(typingUpdate.conversationId), typingUpdate.username);
-          } else {
-            typingUsers.delete(String(typingUpdate.conversationId));
+          const typingUsers = new Map(this.typingUsersSubject.value);
+          const conversationId = String(typingUpdate.conversationId);
+
+          // Don't show typing indicator for the current user
+          const isCurrentUser = typingUpdate.username === this.getCurrentUsername();
+
+          if (isCurrentUser) {
+            console.log('Ignoring typing indicator from current user');
+            return;
           }
 
+          if (typingUpdate.isTyping) {
+            // Add typing user to the map
+            typingUsers.set(conversationId, typingUpdate.username);
+            console.log(`Added typing user ${typingUpdate.username} for conversation ${conversationId}`);
+
+            // Set a safety timeout to clear typing indicator after 10 seconds
+            // This prevents "stuck" typing indicators if the server fails to send the "stopped typing" event
+            setTimeout(() => {
+              const currentTypingUsers = this.typingUsersSubject.value;
+              const currentTypingUser = currentTypingUsers.get(conversationId);
+
+              // Only clear if this user is still marked as typing
+              if (currentTypingUser === typingUpdate.username) {
+                console.log(`Safety timeout: Clearing typing indicator for ${typingUpdate.username}`);
+                const updatedTypingUsers = new Map(currentTypingUsers);
+                updatedTypingUsers.delete(conversationId);
+                this.typingUsersSubject.next(updatedTypingUsers);
+              }
+            }, 10000); // 10 seconds safety timeout
+          } else {
+            // Remove typing user from the map
+            typingUsers.delete(conversationId);
+            console.log(`Removed typing user ${typingUpdate.username} for conversation ${conversationId}`);
+          }
+
+          // Update the subject with the new map
           this.typingUsersSubject.next(typingUsers);
         });
       })
@@ -367,31 +398,31 @@ export class ChatService implements OnDestroy {
    */
   private handleMessageStatusUpdate(statusUpdate: MessageStatusUpdate): void {
     console.log(`ChatService: Processing status update for message ${statusUpdate.messageId}: ${statusUpdate.status}`);
-    
+
     // Get the current messages
     const currentMessages = this.messagesSubject.value;
-    
+
     // Skip processing if there are no messages
     if (currentMessages.length === 0) {
       return;
     }
-    
+
     let hasStatusChanged = false;
     let updatedMessages = [...currentMessages];
 
     // Determine if this is a broadcast update without a specific message ID
-    const isBroadcastUpdate = 
-      statusUpdate.messageId === 0 || 
-      statusUpdate.messageId === null || 
+    const isBroadcastUpdate =
+      statusUpdate.messageId === 0 ||
+      statusUpdate.messageId === null ||
       statusUpdate.messageId === undefined;
 
     // Case 1: If it's a broadcast update, update all messages in the conversation
     if (isBroadcastUpdate) {
       updatedMessages = currentMessages.map(message => {
         // Only update messages in the same conversation with lower status
-        if (message.conversationId === statusUpdate.conversationId && 
+        if (message.conversationId === statusUpdate.conversationId &&
             !this.hasHigherStatus(message.status, statusUpdate.status)) {
-          
+
           hasStatusChanged = true;
           return {
             ...message,
@@ -402,22 +433,22 @@ export class ChatService implements OnDestroy {
         }
         return message;
       });
-    } 
+    }
     // Case 2: Specific message update
     else {
       // Try to find the exact message by ID
       const messageIndex = currentMessages.findIndex(m => m.id === statusUpdate.messageId);
-      
+
       // If found by ID, update it
       if (messageIndex >= 0) {
         const message = currentMessages[messageIndex];
-        
+
         // Only update if the status would actually change and isn't a downgrade
-        if (message.status !== statusUpdate.status && 
+        if (message.status !== statusUpdate.status &&
             !this.hasHigherStatus(message.status, statusUpdate.status)) {
-          
+
           console.log(`ChatService: Updating message ${message.id} status from ${message.status} to ${statusUpdate.status}`);
-          
+
           // Create a new message with updated status
           const updatedMessage = {
             ...message,
@@ -425,27 +456,27 @@ export class ChatService implements OnDestroy {
             deliveredAt: statusUpdate.deliveredAt || message.deliveredAt,
             readAt: statusUpdate.readAt || message.readAt
           };
-          
+
           // Update the message in our array
           updatedMessages[messageIndex] = updatedMessage;
           hasStatusChanged = true;
         }
-      } 
+      }
       // If not found by ID, check for temporary messages in the same conversation
       else {
-        const tempMessageIndex = currentMessages.findIndex(m => 
-          typeof m.id === 'string' && 
-          m.id.toString().startsWith('temp-') && 
+        const tempMessageIndex = currentMessages.findIndex(m =>
+          typeof m.id === 'string' &&
+          m.id.toString().startsWith('temp-') &&
           m.conversationId === statusUpdate.conversationId
         );
-        
+
         if (tempMessageIndex >= 0) {
           const tempMessage = currentMessages[tempMessageIndex];
-          
+
           // Only update if this isn't a status downgrade
           if (!this.hasHigherStatus(tempMessage.status, statusUpdate.status)) {
             console.log(`ChatService: Updating temp message ${tempMessage.id} status from ${tempMessage.status} to ${statusUpdate.status}`);
-            
+
             // Create updated message
             const updatedMessage = {
               ...tempMessage,
@@ -453,7 +484,7 @@ export class ChatService implements OnDestroy {
               deliveredAt: statusUpdate.deliveredAt || tempMessage.deliveredAt,
               readAt: statusUpdate.readAt || tempMessage.readAt
             };
-            
+
             // Update array
             updatedMessages[tempMessageIndex] = updatedMessage;
             hasStatusChanged = true;
@@ -607,7 +638,7 @@ export class ChatService implements OnDestroy {
 
     // Reset unread count for this conversation
     this.resetUnreadCount(conversation.id);
-    
+
     // Automatically mark messages as delivered/read when conversation is selected
     if (this.websocketService.isConnected()) {
       // This will trigger the markMessagesAsRead endpoint which will update SENT → DELIVERED → READ
@@ -720,17 +751,17 @@ export class ChatService implements OnDestroy {
     // This ensures the message appears instantly without waiting for the buffer interval
     const currentMessages = this.messagesSubject.value;
     const updatedMessages = [...currentMessages, tempMessage];
-    
+
     // Sort messages by date (oldest first)
     updatedMessages.sort((a, b) => {
       const dateA = a.sentAt ? new Date(a.sentAt).getTime() : 0;
       const dateB = b.sentAt ? new Date(b.sentAt).getTime() : 0;
       return dateA - dateB;
     });
-    
+
     // Update the message list immediately
     this.messagesSubject.next(updatedMessages);
-    
+
     // Still update the conversation list via buffer (less critical for immediate visibility)
     this.updateConversationWithMessageBuffered(tempMessage);
 
@@ -791,6 +822,23 @@ export class ChatService implements OnDestroy {
   }
 
   /**
+   * Get the current username
+   * @returns The current username or empty string if not available
+   */
+  private getCurrentUsername(): string {
+    try {
+      const userData = localStorage.getItem('userData');
+      if (userData) {
+        const user = JSON.parse(userData);
+        return user.username || '';
+      }
+    } catch (error) {
+      console.error('Error getting current username:', error);
+    }
+    return '';
+  }
+
+  /**
    * Mark all messages in a conversation as read
    * @param conversationId ID of the conversation
    */
@@ -810,9 +858,11 @@ export class ChatService implements OnDestroy {
     const activeConversation = this.activeConversationSubject.value;
 
     if (!activeConversation) {
+      console.warn('Cannot send typing indicator: No active conversation');
       return;
     }
 
+    console.log(`ChatService: Sending typing indicator: ${isTyping ? 'typing' : 'stopped typing'}`);
     this.websocketService.sendTypingIndicator(activeConversation.id, isTyping);
   }
 

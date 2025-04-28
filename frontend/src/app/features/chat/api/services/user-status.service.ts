@@ -13,11 +13,13 @@ import { UserApiService } from './user-api.service';
 })
 export class UserStatusService implements OnDestroy {
   private userStatusMap = new BehaviorSubject<Map<string, string>>(new Map());
+  private userLastSeenMap = new BehaviorSubject<Map<string, Date>>(new Map());
   private subscriptions = new Subscription();
   private initialized = false;
 
   // Observable streams
   public userStatus$ = this.userStatusMap.asObservable();
+  public userLastSeen$ = this.userLastSeenMap.asObservable();
 
   constructor(
     private websocketService: ChatWebsocketService,
@@ -57,9 +59,19 @@ export class UserStatusService implements OnDestroy {
       }
 
       console.log(`UserStatusService: Received status update for user ${statusUpdate.userId}: ${statusUpdate.status}`);
+
+      // Update status map
       const statusMap = this.userStatusMap.value;
       statusMap.set(String(statusUpdate.userId), statusUpdate.status);
       this.userStatusMap.next(new Map(statusMap)); // Create a new Map to trigger change detection
+
+      // Update lastSeen map if available
+      if (statusUpdate.lastActive) {
+        console.log(`UserStatusService: User ${statusUpdate.userId} lastActive: ${statusUpdate.lastActive}`);
+        const lastSeenMap = this.userLastSeenMap.value;
+        lastSeenMap.set(String(statusUpdate.userId), statusUpdate.lastActive);
+        this.userLastSeenMap.next(new Map(lastSeenMap)); // Create a new Map to trigger change detection
+      }
     });
 
     this.subscriptions.add(statusSub);
@@ -118,21 +130,41 @@ export class UserStatusService implements OnDestroy {
   }
 
   /**
+   * Get a user's last seen timestamp
+   * @param userId ID of the user
+   * @returns The user's last seen timestamp or undefined if not found
+   */
+  public getUserLastSeen(userId: string | number): Date | undefined {
+    if (!userId) return undefined;
+
+    const lastSeenMap = this.userLastSeenMap.value;
+    return lastSeenMap.get(String(userId));
+  }
+
+  /**
    * Load initial status for all users
    */
   public loadAllUserStatuses(): Observable<any> {
     return this.userApiService.getAllUsers().pipe(
       tap(users => {
         const statusMap = this.userStatusMap.value;
+        const lastSeenMap = this.userLastSeenMap.value;
 
         // Update status map with all users
         users.forEach(user => {
           if (user && user.id) {
+            // Update status
             statusMap.set(String(user.id), user.status || 'OFFLINE');
+
+            // Update lastSeen if available
+            if (user.lastSeen) {
+              lastSeenMap.set(String(user.id), user.lastSeen);
+            }
           }
         });
 
         this.userStatusMap.next(new Map(statusMap)); // Create a new Map to trigger change detection
+        this.userLastSeenMap.next(new Map(lastSeenMap)); // Create a new Map to trigger change detection
         console.log(`UserStatusService: Loaded status for ${users.length} users`);
       }),
       catchError(error => {

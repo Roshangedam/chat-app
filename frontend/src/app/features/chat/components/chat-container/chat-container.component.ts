@@ -69,15 +69,26 @@ export class ChatContainerComponent implements OnInit, OnDestroy {
     // Subscribe to typing indicators
     const typingSub = this.chatService.typingUsers$.subscribe(typingUsers => {
       if (this.conversation) {
-        const typingUsername = typingUsers.get(String(this.conversation.id));
+        const conversationId = String(this.conversation.id);
+        const typingUsername = typingUsers.get(conversationId);
+
+        // Update typing status
+        const wasTyping = this.isTyping;
         this.isTyping = !!typingUsername;
         this.typingUser = typingUsername || '';
+
+        console.log(`Chat container: Typing status for conversation ${conversationId}: ${this.isTyping ? this.typingUser + ' is typing' : 'no one is typing'}`);
+
+        // If typing status changed, force change detection
+        if (wasTyping !== this.isTyping) {
+          console.log(`Chat container: Typing status changed from ${wasTyping} to ${this.isTyping}`);
+        }
       } else {
         this.isTyping = false;
         this.typingUser = '';
       }
     });
-    
+
     // Subscribe to message status updates
     const statusSub = this.chatService.messageStatus$.subscribe((statusUpdate: MessageStatusUpdate) => {
       // Just subscribing ensures the updates are processed, even if we don't do anything with them here
@@ -143,6 +154,9 @@ export class ChatContainerComponent implements OnInit, OnDestroy {
    * Handle typing indicator
    */
   onTyping(): void {
+    console.log('Chat container: User is typing');
+
+    // Send typing indicator to server
     this.chatService.sendTypingIndicator(true);
 
     // Clear previous timeout
@@ -152,8 +166,25 @@ export class ChatContainerComponent implements OnInit, OnDestroy {
 
     // Set timeout to stop typing indicator after 2 seconds of inactivity
     this.typingTimeout = setTimeout(() => {
+      console.log('Chat container: User stopped typing (timeout)');
       this.chatService.sendTypingIndicator(false);
     }, 2000);
+  }
+
+  /**
+   * Handle stopped typing event
+   */
+  onStoppedTyping(): void {
+    console.log('Chat container: User stopped typing (explicit)');
+
+    // Clear any existing timeout
+    if (this.typingTimeout) {
+      clearTimeout(this.typingTimeout);
+      this.typingTimeout = null;
+    }
+
+    // Send stopped typing indicator
+    this.chatService.sendTypingIndicator(false);
   }
 
   /**
@@ -178,7 +209,7 @@ export class ChatContainerComponent implements OnInit, OnDestroy {
         if (messages.length < this.pageSize) {
           this.hasMoreMessages = false;
         }
-        
+
         // Automatically mark messages as read when conversation is loaded
         if (page === 0 && messages.length > 0 && this.conversation != null) {
           this.chatService.markMessagesAsRead(this.conversation.id).subscribe();

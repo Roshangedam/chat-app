@@ -28,6 +28,7 @@ export class ChatMessageInputComponent implements OnInit {
   @Input() disabled = false;
   @Output() messageSent = new EventEmitter<string>();
   @Output() typing = new EventEmitter<void>();
+  @Output() stoppedTyping = new EventEmitter<void>();
   @ViewChild('inputContainer') inputContainer!: ElementRef;
 
   messageForm: FormGroup;
@@ -51,6 +52,16 @@ export class ChatMessageInputComponent implements OnInit {
 
     const message = this.messageForm.value.message.trim();
     if (message) {
+      // When sending a message, also stop typing indicator
+      this.stoppedTyping.emit();
+
+      // Clear any typing timeout
+      if (this.typingTimeout) {
+        clearTimeout(this.typingTimeout);
+        this.typingTimeout = null;
+      }
+
+      // Send the message
       this.messageSent.emit(message);
       this.messageForm.reset({ message: '' });
 
@@ -73,13 +84,43 @@ export class ChatMessageInputComponent implements OnInit {
       clearTimeout(this.typingTimeout);
     }
 
-    // Emit typing event
-    this.typing.emit();
+    // Only emit typing event if there's actual content
+    const message = this.messageForm.get('message')?.value;
+    if (message && message.trim().length > 0) {
+      // Emit typing event
+      console.log('ChatMessageInput: Emitting typing event');
+      this.typing.emit();
 
-    // Set timeout to stop typing indicator after 2 seconds of inactivity
-    this.typingTimeout = setTimeout(() => {
-      // You could emit another event here if needed to indicate user stopped typing
-    }, 2000);
+      // Set timeout to stop typing indicator after 2 seconds of inactivity
+      this.typingTimeout = setTimeout(() => {
+        // Emit another event to indicate user stopped typing
+        // This is handled in the container component
+        console.log('ChatMessageInput: Typing timeout - user stopped typing');
+        // We need to emit an event to stop typing
+        this.stoppedTyping.emit();
+      }, 2000);
+    } else {
+      // If there's no content, stop typing indicator immediately
+      console.log('ChatMessageInput: No content - stopping typing indicator');
+      this.stoppedTyping.emit();
+    }
+  }
+
+  /**
+   * Handle input blur event (when input loses focus)
+   */
+  onInputBlur(): void {
+    // When the input loses focus, stop typing indicator
+    console.log('ChatMessageInput: Input blur - stopping typing indicator');
+
+    // Clear any typing timeout
+    if (this.typingTimeout) {
+      clearTimeout(this.typingTimeout);
+      this.typingTimeout = null;
+    }
+
+    // Emit stopped typing event
+    this.stoppedTyping.emit();
   }
 
   /**

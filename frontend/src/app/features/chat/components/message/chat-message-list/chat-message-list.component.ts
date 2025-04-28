@@ -60,12 +60,12 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
   touchStartY = 0; // Starting Y position for touch events
   mouseStartY = 0; // Starting Y position for mouse events
   isMouseDown = false; // Whether mouse is currently down
-  
+
   // Add a subscription for message status updates
   private statusSubscription = new Subscription();
 
   constructor(
-    private cdRef: ChangeDetectorRef, 
+    private cdRef: ChangeDetectorRef,
     private ngZone: NgZone,
     private chatService: ChatService
   ) {}
@@ -73,11 +73,11 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
   ngOnInit(): void {
     // Setup scroll event listener after view is initialized
     setTimeout(() => this.setupScrollListener(), 0);
-    
+
     // Subscribe to message status updates
     this.subscribeToMessageStatusUpdates();
   }
-  
+
   /**
    * Subscribe to real-time message status updates from the chat service
    * This ensures status changes are immediately reflected in the UI
@@ -87,9 +87,9 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
     this.statusSubscription = this.chatService.messageStatus$.subscribe((statusUpdate: MessageStatusUpdate) => {
       // Skip running the update if not currently in the component's view
       if (!this.messages || this.messages.length === 0) return;
-      
+
       console.log(`Message list received status update: ${statusUpdate.messageId} → ${statusUpdate.status}`);
-      
+
       // Request change detection check to update the UI immediately
       this.ngZone.run(() => {
         // Status updates are automatically handled by the chat service's messages$ observable,
@@ -97,7 +97,7 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
         this.cdRef.markForCheck();
       });
     });
-    
+
     // Subscribe to messages observable to handle newly sent messages
     const messagesSub = this.chatService.messages$.subscribe(messages => {
       // If we have a new message (more messages than before), scroll to bottom
@@ -108,7 +108,7 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
         }, 50);
       }
     });
-    
+
     // Add to subscriptions for cleanup
     this.statusSubscription.add(messagesSub);
   }
@@ -128,6 +128,7 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
         previousMessages.length > 0 &&
         currentMessages[0] !== previousMessages[0];
 
+
       // Use requestAnimationFrame for smoother scrolling
       requestAnimationFrame(() => {
         if (olderMessagesLoaded) {
@@ -135,10 +136,15 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
           this.maintainScrollPosition();
           this.stopLoadingAnimation();
           this.isLoadingMore = false;
-        } else if (newMessagesAdded || previousMessages.length === 0) {
-          // New messages were added at the bottom or initial load
+        } else if ((newMessagesAdded) || previousMessages.length === 0) {
+          // New messages were added at the bottom (and we were near bottom) or initial load
           this.scrollToBottom();
         }
+
+        // Force change detection to update UI immediately
+        this.ngZone.run(() => {
+          this.cdRef.detectChanges();
+        });
       });
     }
 
@@ -153,7 +159,30 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
       } else if (!isNowLoading && wasLoading) {
         // Finished loading
         this.stopLoadingAnimation();
+
+        // Force change detection to update UI immediately
+        this.ngZone.run(() => {
+          this.cdRef.detectChanges();
+        });
       }
+    }
+
+    // Handle typing indicator changes
+    if (changes['isTyping'] || changes['typingUser']) {
+      // If typing status changed, scroll to bottom to show typing indicator
+      if (this.isTyping && this.typingUser) {
+        console.log(`ChatMessageList: Showing typing indicator for ${this.typingUser}`);
+        setTimeout(() => {
+          this.scrollToBottom();
+        }, 100);
+      } else if (!this.isTyping) {
+        console.log('ChatMessageList: Hiding typing indicator');
+      }
+
+      // Force change detection to update UI immediately
+      this.ngZone.run(() => {
+        this.cdRef.detectChanges();
+      });
     }
   }
 
@@ -162,7 +191,7 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
     if (this.scrollSubscription) {
       this.scrollSubscription.unsubscribe();
     }
-    
+
     // Clean up status update subscription
     if (this.statusSubscription) {
       this.statusSubscription.unsubscribe();

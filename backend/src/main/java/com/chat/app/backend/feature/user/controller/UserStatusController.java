@@ -62,12 +62,17 @@ public class UserStatusController {
                 user.setLastActive(LocalDateTime.now());
                 userRepository.save(user);
 
+                // Set lastActive timestamp (current time for all statuses)
+                LocalDateTime currentTime = LocalDateTime.now();
+                user.setLastActive(currentTime);
+
                 // Create status update DTO for broadcasting
-                UserStatusDTO broadcastStatus = new UserStatusDTO();
-                broadcastStatus.setUserId(userId);
-                broadcastStatus.setUsername(user.getUsername());
-                broadcastStatus.setStatus(statusDTO.getStatus());
-                broadcastStatus.setLastActive(LocalDateTime.now());
+                UserStatusDTO broadcastStatus = new UserStatusDTO(
+                    userId,
+                    user.getUsername(),
+                    statusDTO.getStatus(),
+                    currentTime // Pass lastActive directly to constructor
+                );
 
                 // Broadcast to all users
                 messagingTemplate.convertAndSend("/topic/user.status", broadcastStatus);

@@ -1,10 +1,10 @@
 import { Injectable, OnDestroy, NgZone } from '@angular/core';
-import { BehaviorSubject, Subject, Observable, timer, Subscription, of } from 'rxjs';
+import { BehaviorSubject, Subject, Observable, timer, Subscription } from 'rxjs';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
-import { switchMap, filter, take, retryWhen, delayWhen, tap, catchError } from 'rxjs/operators';
+import { filter } from 'rxjs/operators';
 import SockJS from 'sockjs-client';
 import { environment } from '../../../../../environments/environment';
-import { ChatMessage, MessageStatusUpdate } from '../models';
+import { ChatMessage, MessageStatusUpdate, UserStatusUpdate } from '../models';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -22,7 +22,7 @@ export class ChatWebsocketService implements OnDestroy {
   private messageReceivedSubject = new Subject<ChatMessage>();
   private messageStatusSubject = new Subject<MessageStatusUpdate>();
   private typingStatusSubject = new Subject<{conversationId: string | number, username: string, isTyping: boolean}>();
-  private userStatusSubject = new Subject<{userId: string | number, username: string, status: string}>();
+  private userStatusSubject = new Subject<UserStatusUpdate>();
   private syncCompleteSubject = new Subject<{syncedCount: number, timestamp: number}>();
 
   // Reconnection properties
@@ -198,14 +198,26 @@ export class ChatWebsocketService implements OnDestroy {
       try {
         if (message && message.body) {
           const typingData = JSON.parse(message.body);
-          if (typingData && typingData.username !== undefined && typingData.isTyping !== undefined) {
-            this.typingStatusSubject.next({
-              conversationId: conversationId,
-              username: typingData.username,
-              isTyping: typingData.isTyping
+          console.log('Received typing data:', typingData);
+
+          // The backend uses isTyping property (Java boolean getter/setter naming convention)
+          // In Java, the getter is isTyping() but in JSON it might be serialized as either isTyping or typing
+          const isTyping = typingData.isTyping !== undefined ? typingData.isTyping :
+                          (typingData.typing !== undefined ? typingData.typing : false);
+
+          if (typingData && typingData.username !== undefined) {
+            // Use NgZone to ensure the update is processed in the Angular zone
+            this.ngZone.run(() => {
+              this.typingStatusSubject.next({
+                conversationId: conversationId,
+                username: typingData.username,
+                isTyping: isTyping
+              });
+
+              console.log(`Typing indicator: ${typingData.username} is ${isTyping ? 'typing' : 'not typing'}`);
             });
           } else {
-            console.warn('Received invalid typing indicator data');
+            console.warn('Received invalid typing indicator data:', typingData);
           }
         } else {
           console.warn('Received empty typing indicator message');
@@ -257,7 +269,7 @@ export class ChatWebsocketService implements OnDestroy {
               readAt: statusData.readAt ? new Date(statusData.readAt) : undefined
             };
             this.messageStatusSubject.next(statusUpdate);
-            
+
             console.log(`Received status update for message ${statusData.id}: ${status}`);
           } else {
             console.warn('Received invalid message status data');
@@ -272,7 +284,7 @@ export class ChatWebsocketService implements OnDestroy {
 
     // Store the subscription
     this.subscriptions.set(destination, subscription);
-    
+
     // Request immediate status updates when subscribing to a conversation
     // This helps refresh message statuses when a user opens a conversation
     if (this.stompClient && this.stompClient.connected) {
@@ -371,16 +383,23 @@ export class ChatWebsocketService implements OnDestroy {
    */
   public sendTypingIndicator(conversationId: string | number, isTyping: boolean): void {
     if (!this.stompClient || !this.stompClient.connected) {
+      console.warn('WebSocket not connected, cannot send typing indicator');
       return;
     }
 
-    this.stompClient.publish({
-      destination: '/app/chat.typing',
-      body: JSON.stringify({
-        conversationId: conversationId,
-        isTyping: isTyping
-      })
-    });
+    try {
+      console.log(`Sending typing indicator: ${isTyping ? 'typing' : 'stopped typing'} in conversation ${conversationId}`);
+
+      this.stompClient.publish({
+        destination: '/app/chat.typing',
+        body: JSON.stringify({
+          conversationId: conversationId,
+          typing: isTyping  // Use 'typing' to match the Java setter setTyping(boolean typing)
+        })
+      });
+    } catch (error) {
+      console.error('Error sending typing indicator:', error);
+    }
   }
 
   /**
@@ -421,10 +440,22 @@ export class ChatWebsocketService implements OnDestroy {
         if (message && message.body) {
           const statusData = JSON.parse(message.body);
           if (statusData && statusData.userId && statusData.status) {
+            // Parse lastActive timestamp if available
+            let lastActive = null;
+            if (statusData.lastActive) {
+              try {
+                lastActive = new Date(statusData.lastActive);
+                console.log(`Received lastActive timestamp: ${lastActive} for user ${statusData.userId}`);
+              } catch (e) {
+                console.warn(`Failed to parse lastActive timestamp: ${statusData.lastActive}`, e);
+              }
+            }
+
             this.userStatusSubject.next({
               userId: statusData.userId,
               username: statusData.username || '',
-              status: statusData.status
+              status: statusData.status,
+              lastActive: lastActive
             });
           } else {
             console.warn('Received invalid user status data');

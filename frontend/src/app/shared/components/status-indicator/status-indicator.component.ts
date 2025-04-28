@@ -1,10 +1,11 @@
-import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { StatusService, UserStatus } from '../../services/status.service';
 
 /**
  * A reusable component for displaying user status indicators
+ * This component shows a colored dot indicating a user's online status
  */
 @Component({
   selector: 'app-status-indicator',
@@ -50,7 +51,7 @@ import { StatusService, UserStatus } from '../../services/status.service';
   `],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class StatusIndicatorComponent implements OnInit, OnDestroy {
+export class StatusIndicatorComponent implements OnInit, OnChanges, OnDestroy {
   @Input() userId: string | number | null = null;
   @Input() status: string | null = null;
   @Input() size: 'small' | 'normal' | 'large' = 'normal';
@@ -60,6 +61,7 @@ export class StatusIndicatorComponent implements OnInit, OnDestroy {
 
   private subscriptions = new Subscription();
   private currentStatus: UserStatus = 'OFFLINE';
+  private lastCheckedUserId: string | null = null;
 
   constructor(
     private statusService: StatusService,
@@ -67,24 +69,67 @@ export class StatusIndicatorComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    // Initialize status class
     this.updateStatusClass();
 
     // Subscribe to status updates only for this specific user
-    if (this.userId) {
-      this.subscriptions.add(
-        this.statusService.getUserStatusUpdates(this.userId).subscribe(status => {
-          if (status !== this.currentStatus) {
-            this.currentStatus = status;
-            this.updateStatusClass();
-            this.cdr.markForCheck();
-          }
-        })
-      );
+    this.subscribeToStatusUpdates();
+  }
+
+  /**
+   * Handle input changes
+   */
+  ngOnChanges(changes: SimpleChanges): void {
+    // If userId changes, we need to resubscribe to status updates
+    if (changes['userId'] && this.userId !== this.lastCheckedUserId) {
+      // Unsubscribe from previous subscriptions
+      this.subscriptions.unsubscribe();
+      this.subscriptions = new Subscription();
+
+      // Update last checked userId
+      this.lastCheckedUserId = this.userId ? String(this.userId) : null;
+
+      // Resubscribe with new userId
+      this.subscribeToStatusUpdates();
+
+      // Update status class immediately
+      this.updateStatusClass();
+    }
+
+    // If status input changes directly, update the status class
+    if (changes['status']) {
+      this.updateStatusClass();
+    }
+
+    // If size changes, update the status class
+    if (changes['size']) {
+      this.updateStatusClass();
     }
   }
 
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
+  }
+
+  /**
+   * Subscribe to status updates for the current userId
+   */
+  private subscribeToStatusUpdates(): void {
+    if (!this.userId) return;
+
+    // Try to refresh the status first to ensure we have the latest data
+    this.statusService.refreshUserStatus(this.userId);
+
+    // Subscribe to status updates
+    this.subscriptions.add(
+      this.statusService.getUserStatusUpdates(this.userId).subscribe(status => {
+        if (status !== this.currentStatus) {
+          this.currentStatus = status;
+          this.updateStatusClass();
+          this.cdr.markForCheck();
+        }
+      })
+    );
   }
 
   /**
@@ -95,12 +140,23 @@ export class StatusIndicatorComponent implements OnInit, OnDestroy {
 
     // First priority: Use the status from the StatusService if we have a userId
     if (this.userId) {
-      this.currentStatus = this.statusService.getUserStatus(this.userId);
-      statusValue = this.currentStatus.toLowerCase();
+      try {
+        this.currentStatus = this.statusService.getUserStatus(this.userId);
+        statusValue = this.currentStatus.toLowerCase();
+      } catch (error) {
+        console.error(`StatusIndicator: Error getting status for user ${this.userId}`, error);
+        statusValue = 'offline'; // Default to offline on error
+      }
     }
     // Second priority: Use the status input if provided
     else if (this.status) {
-      statusValue = this.status.toLowerCase();
+      // Normalize status value
+      const normalizedStatus = this.status.toUpperCase();
+      if (['ONLINE', 'AWAY', 'OFFLINE'].includes(normalizedStatus)) {
+        statusValue = normalizedStatus.toLowerCase();
+      } else {
+        statusValue = 'offline'; // Default for invalid status
+      }
     }
     // Default to offline
     else {

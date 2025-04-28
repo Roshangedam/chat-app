@@ -1,7 +1,8 @@
 package com.chat.app.backend.feature.user.dto;
 
-import com.chat.app.backend.feature.user.model.UserStatus;
 import java.time.LocalDateTime;
+
+import com.chat.app.backend.feature.user.model.UserStatus;
 
 /**
  * Data Transfer Object for user status updates.
@@ -22,7 +23,15 @@ public class UserStatusDTO {
         this.userId = userId;
         this.username = username;
         this.status = status;
-        this.lastActive = LocalDateTime.now();
+        this.lastActive = LocalDateTime.now(); // Default to current time
+    }
+
+    // Constructor with all fields including lastActive
+    public UserStatusDTO(Long userId, String username, UserStatus status, LocalDateTime lastActive) {
+        this.userId = userId;
+        this.username = username;
+        this.status = status;
+        this.lastActive = lastActive != null ? lastActive : LocalDateTime.now();
     }
 
     // Getters and Setters

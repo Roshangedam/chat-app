@@ -8,6 +8,7 @@
         [disabled]="disabled"
         (keyup)="onTyping()"
         (keypress)="onKeyPress($event)"
+        (blur)="onInputBlur()"
         autocomplete="off">
       <mat-error *ngIf="messageForm.get('message')?.hasError('required')">
         Message cannot be empty

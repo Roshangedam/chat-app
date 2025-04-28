@@ -24,6 +24,7 @@
   <chat-message-input
     [disabled]="isSending || !conversation"
     (messageSent)="onSendMessage($event)"
-    (typing)="onTyping()">
+    (typing)="onTyping()"
+    (stoppedTyping)="onStoppedTyping()">
   </chat-message-input>
 </div>

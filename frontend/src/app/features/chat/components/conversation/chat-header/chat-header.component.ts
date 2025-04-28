@@ -153,21 +153,35 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
     // Get the other participant
     const otherParticipant = this.getOtherParticipant();
     if (!otherParticipant || !otherParticipant.id) {
+      console.warn('ChatHeader: Cannot subscribe to status updates - other participant not found or has no ID');
       return;
     }
 
+    // First, refresh the status service data for this user to ensure we have the latest
+    this.statusService.refreshUserStatus(otherParticipant.id);
+
     // Check if lastSeen data is missing and fetch it if needed
-    if (otherParticipant.status === 'OFFLINE' && !otherParticipant.lastSeen) {
+    if ((otherParticipant.status === 'OFFLINE' || this.statusService.getUserStatus(otherParticipant.id) === 'OFFLINE')
+        && !otherParticipant.lastSeen) {
       console.log(`ChatHeader: Fetching user details for ${otherParticipant.id} to get lastSeen data`);
 
+      // Use a single API call to get user details
       const userDetailsSub = this.userApiService.getUser(otherParticipant.id)
         .pipe(
           tap(userDetails => {
             console.log(`ChatHeader: Received user details for ${otherParticipant.id}`, userDetails);
 
             // Update the participant object with lastSeen data
-            if (userDetails && userDetails.lastSeen) {
-              otherParticipant.lastSeen = userDetails.lastSeen;
+            if (userDetails) {
+              // Update status if available
+              if (userDetails.status) {
+                otherParticipant.status = userDetails.status;
+              }
+
+              // Update lastSeen if available
+              if (userDetails.lastSeen) {
+                otherParticipant.lastSeen = userDetails.lastSeen;
+              }
 
               // Clear cached values to force recalculation
               this._cachedStatusText = '';
@@ -192,21 +206,47 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
       .subscribe(status => {
         console.log(`ChatHeader: Status update for user ${otherParticipant.id}: ${status}`);
 
-        // If status changed to OFFLINE, fetch user details to get updated lastSeen
+        // Update the participant's status
+        otherParticipant.status = status;
+
+        // If status changed to OFFLINE and we don't have lastSeen data, fetch it
         if (status === 'OFFLINE' && !otherParticipant.lastSeen) {
-          this.userApiService.getUser(otherParticipant.id)
-            .pipe(
-              tap(userDetails => {
-                if (userDetails && userDetails.lastSeen) {
-                  otherParticipant.lastSeen = userDetails.lastSeen;
-                }
-              }),
-              catchError(error => {
-                console.error(`ChatHeader: Error fetching user details after status change:`, error);
-                return of(null);
-              })
-            )
-            .subscribe();
+          // Try to get lastSeen from StatusService first
+          const lastSeen = this.statusService.getUserLastSeen(otherParticipant.id);
+
+          if (lastSeen) {
+            // Use lastSeen from StatusService
+            otherParticipant.lastSeen = lastSeen;
+
+            // Clear cached values to force recalculation
+            this._cachedStatusText = '';
+            this._cachedStatusClass = '';
+
+            // Manually trigger change detection
+            this.cdr.markForCheck();
+          } else {
+            // If not available in StatusService, fetch from API
+            this.userApiService.getUser(otherParticipant.id)
+              .pipe(
+                tap(userDetails => {
+                  if (userDetails && userDetails.lastSeen) {
+                    otherParticipant.lastSeen = userDetails.lastSeen;
+
+                    // Clear cached values to force recalculation
+                    this._cachedStatusText = '';
+                    this._cachedStatusClass = '';
+
+                    // Manually trigger change detection
+                    this.cdr.markForCheck();
+                  }
+                }),
+                catchError(error => {
+                  console.error(`ChatHeader: Error fetching user details after status change:`, error);
+                  return of(null);
+                })
+              )
+              .subscribe();
+          }
         }
 
         // Clear cached values to force recalculation
@@ -350,83 +390,53 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
    * @returns The formatted status text based on typing and user status
    */
   getStatusText(): string {
-
-    // Return cached value if available
+    // Return cached value if available to prevent recalculation
     if (this._cachedStatusText) {
       return this._cachedStatusText;
     }
 
-    // Typing indicator takes precedence
-    if (this.isTyping && this.typingUser) {
-      this._cachedStatusText = `${this.typingUser} is typing...`;
-      return this._cachedStatusText;
-    }
-
-    // No status for group chats unless someone is typing
-    if (!this.conversation || (this.conversation.groupChat && !this.isTyping)) {
-      this._cachedStatusText = '';
-      return this._cachedStatusText;
-    }
-
-    // For one-to-one chats, show the other participant's status
-    const otherParticipant = this.getOtherParticipant();
-    if (otherParticipant) {
-      // First check if we have a real-time status from the StatusService
-      if (otherParticipant.id) {
-        const realTimeStatus = this.statusService.getUserStatus(otherParticipant.id);
-        if (realTimeStatus) {
-          switch (realTimeStatus.toUpperCase()) {
-            case 'ONLINE':
-              this._cachedStatusText = 'Online';
-              break;
-            case 'AWAY':
-              this._cachedStatusText = 'Away';
-              break;
-            case 'DO_NOT_DISTURB':
-              this._cachedStatusText = 'Do not disturb';
-              break;
-            case 'OFFLINE':
-              // Show last seen time if available
-              if (otherParticipant.lastSeen) {
-                this._cachedStatusText = `Last seen ${this.formatLastSeen(otherParticipant.lastSeen)}`;
-              } else {
-                this._cachedStatusText = 'Offline';
-
-                // If lastSeen is undefined or null, fetch it from the API
-                console.log(`ChatHeader: getStatusText - lastSeen is missing for user ${otherParticipant.id}, fetching from API`);
-                this.userApiService.getUser(otherParticipant.id)
-                  .pipe(
-                    tap(userDetails => {
-                      if (userDetails && userDetails.lastSeen) {
-                        console.log(`ChatHeader: getStatusText - Received lastSeen data for user ${otherParticipant.id}`, userDetails.lastSeen);
-                        otherParticipant.lastSeen = userDetails.lastSeen;
-
-                        // Update the status text with the new lastSeen data
-                        this._cachedStatusText = `Last seen ${this.formatLastSeen(otherParticipant.lastSeen)}`;
-
-                        // Manually trigger change detection
-                        this.cdr.markForCheck();
-                      }
-                    }),
-                    catchError(error => {
-                      console.error(`ChatHeader: getStatusText - Error fetching user details:`, error);
-                      return of(null);
-                    })
-                  )
-                  .subscribe();
-              }
-              break;
-            default:
-              this._cachedStatusText = 'Offline';
-              break;
-          }
-          return this._cachedStatusText;
-        }
+    try {
+      // Typing indicator takes precedence
+      if (this.isTyping && this.typingUser) {
+        this._cachedStatusText = `${this.typingUser} is typing...`;
+        return this._cachedStatusText;
       }
 
-      // Fall back to the status stored in the participant object
-      const status = otherParticipant.status?.toUpperCase() || 'OFFLINE';
-      switch (status) {
+      // No status for group chats unless someone is typing
+      if (!this.conversation || (this.conversation.groupChat && !this.isTyping)) {
+        this._cachedStatusText = '';
+        return this._cachedStatusText;
+      }
+
+      // For one-to-one chats, show the other participant's status
+      const otherParticipant = this.getOtherParticipant();
+      if (!otherParticipant) {
+        // If we couldn't find the other participant, show a generic status
+        this._cachedStatusText = this.conversation.groupChat ? '' : 'Offline';
+        return this._cachedStatusText;
+      }
+
+      // Get the user's status - first try StatusService, then fall back to participant object
+      let userStatus: string = 'OFFLINE';
+      let lastSeenDate: Date | undefined = undefined;
+
+      // First check if we have a real-time status from the StatusService
+      if (otherParticipant.id) {
+        try {
+          userStatus = this.statusService.getUserStatus(otherParticipant.id);
+          lastSeenDate = this.statusService.getUserLastSeen(otherParticipant.id);
+        } catch (error) {
+          console.error(`ChatHeader: Error getting status from StatusService for user ${otherParticipant.id}:`, error);
+          // Fall back to the status stored in the participant object
+          userStatus = otherParticipant.status?.toUpperCase() || 'OFFLINE';
+        }
+      } else {
+        // Fall back to the status stored in the participant object
+        userStatus = otherParticipant.status?.toUpperCase() || 'OFFLINE';
+      }
+
+      // Format the status text based on the user's status
+      switch (userStatus) {
         case 'ONLINE':
           this._cachedStatusText = 'Online';
           break;
@@ -438,48 +448,55 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
           break;
         case 'OFFLINE':
         default:
-          // Show last seen time if available
-          if (otherParticipant.lastSeen) {
+          // For offline users, show last seen time if available
+          if (lastSeenDate) {
+            // Use lastSeen from StatusService
+            this._cachedStatusText = `Last seen ${this.formatLastSeen(lastSeenDate)}`;
+          } else if (otherParticipant.lastSeen) {
+            // Fall back to lastSeen from participant object
             this._cachedStatusText = `Last seen ${this.formatLastSeen(otherParticipant.lastSeen)}`;
           } else {
+            // If no lastSeen data is available, just show 'Offline'
             this._cachedStatusText = 'Offline';
 
-            // If lastSeen is undefined or null, fetch it from the API
-            console.log(`ChatHeader: getStatusText - lastSeen is missing for user ${otherParticipant.id}, fetching from API`);
-            this.userApiService.getUser(otherParticipant.id)
-              .pipe(
-                tap(userDetails => {
-                  if (userDetails && userDetails.lastSeen) {
-                    console.log(`ChatHeader: getStatusText - Received lastSeen data for user ${otherParticipant.id}`, userDetails.lastSeen);
-                    otherParticipant.lastSeen = userDetails.lastSeen;
+            // Only fetch lastSeen data if we haven't already tried
+            if (otherParticipant.id && !otherParticipant._lastSeenFetchAttempted) {
+              // Mark that we've attempted to fetch lastSeen data
+              otherParticipant._lastSeenFetchAttempted = true;
 
-                    // Update the status text with the new lastSeen data
-                    this._cachedStatusText = `Last seen ${this.formatLastSeen(otherParticipant.lastSeen)}`;
+              // Fetch user details to get lastSeen data
+              this.userApiService.getUser(otherParticipant.id)
+                .pipe(
+                  tap(userDetails => {
+                    if (userDetails && userDetails.lastSeen) {
+                      // Update the participant object with lastSeen data
+                      otherParticipant.lastSeen = userDetails.lastSeen;
 
-                    // Manually trigger change detection
-                    this.cdr.markForCheck();
-                  }
-                }),
-                catchError(error => {
-                  console.error(`ChatHeader: getStatusText - Error fetching user details:`, error);
-                  return of(null);
-                })
-              )
-              .subscribe();
+                      // Update the status text with the new lastSeen data
+                      this._cachedStatusText = `Last seen ${this.formatLastSeen(otherParticipant.lastSeen)}`;
+
+                      // Manually trigger change detection
+                      this.cdr.markForCheck();
+                    }
+                  }),
+                  catchError(error => {
+                    console.error(`ChatHeader: Error fetching user details for lastSeen:`, error);
+                    return of(null);
+                  })
+                )
+                .subscribe();
+            }
           }
           break;
       }
+
+      return this._cachedStatusText;
+    } catch (error) {
+      // If anything goes wrong, return a safe default
+      console.error('ChatHeader: Error in getStatusText:', error);
+      this._cachedStatusText = '';
       return this._cachedStatusText;
     }
-
-    // If we couldn't find the other participant, show a generic status
-    if (!this.conversation.groupChat) {
-      this._cachedStatusText = 'Offline';
-      return this._cachedStatusText;
-    }
-
-    this._cachedStatusText = '';
-    return this._cachedStatusText;
   }
 
   /**
@@ -488,7 +505,12 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
    * @returns Formatted string (e.g., "5 minutes ago", "Yesterday at 2:30 PM")
    */
   private formatLastSeen(lastSeen: Date | string): string {
-    if (!lastSeen) return '';
+    if (!lastSeen) {
+      console.warn('ChatHeader: formatLastSeen called with null or undefined lastSeen');
+      return '';
+    }
+
+    console.log('ChatHeader: Formatting lastSeen:', lastSeen, 'Type:', typeof lastSeen);
 
     // Try to parse the date
     let lastSeenDate: Date;
@@ -496,6 +518,7 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
     if (typeof lastSeen === 'string') {
       // Handle ISO string format
       lastSeenDate = new Date(lastSeen);
+      console.log('ChatHeader: Parsed string lastSeen to date:', lastSeenDate);
 
       // If parsing failed, try alternative formats
       if (isNaN(lastSeenDate.getTime())) {
@@ -503,6 +526,7 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
         const timestamp = parseInt(lastSeen, 10);
         if (!isNaN(timestamp)) {
           lastSeenDate = new Date(timestamp);
+          console.log('ChatHeader: Parsed timestamp lastSeen to date:', lastSeenDate);
         } else {
           console.warn('ChatHeader: Invalid lastSeen date format', lastSeen);
           return '';
@@ -510,6 +534,7 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
       }
     } else {
       lastSeenDate = lastSeen;
+      console.log('ChatHeader: Using Date object directly:', lastSeenDate);
     }
 
     const now = new Date();

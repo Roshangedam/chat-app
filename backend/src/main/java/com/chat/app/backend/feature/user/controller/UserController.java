@@ -133,13 +133,14 @@ public class UserController {
         UserDTO userDTO = convertToDTO(savedUser);
 
         // Broadcast status update to all connected clients
-        messagingTemplate.convertAndSend("/topic/user.status",
+        com.chat.app.backend.feature.user.dto.UserStatusDTO statusDTO =
             new com.chat.app.backend.feature.user.dto.UserStatusDTO(
                 savedUser.getId(),
                 savedUser.getUsername(),
-                savedUser.getStatus()
-            )
-        );
+                savedUser.getStatus(),
+                savedUser.getLastActive() // Pass lastActive directly to constructor
+            );
+        messagingTemplate.convertAndSend("/topic/user.status", statusDTO);
 
         // If user is coming online, process pending messages
         if (UserStatus.ONLINE.equals(status.getStatus())) {
@@ -212,13 +213,14 @@ public class UserController {
         User savedUser = userRepository.save(user);
 
         // Broadcast status update to all connected clients
-        messagingTemplate.convertAndSend("/topic/user.status",
+        com.chat.app.backend.feature.user.dto.UserStatusDTO statusDTO =
             new com.chat.app.backend.feature.user.dto.UserStatusDTO(
                 savedUser.getId(),
                 savedUser.getUsername(),
-                UserStatus.OFFLINE
-            )
-        );
+                UserStatus.OFFLINE,
+                savedUser.getLastActive() // Pass lastActive directly to constructor
+            );
+        messagingTemplate.convertAndSend("/topic/user.status", statusDTO);
 
         return ResponseEntity.ok().body("Logged out successfully");
     }

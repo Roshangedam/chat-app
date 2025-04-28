@@ -76,8 +76,8 @@
     </ng-container>
 
     <!-- Typing indicator -->
-    <div class="typing-indicator" *ngIf="isTyping">
-      <div class="avatar" *ngIf="typingUser">
+    <div class="typing-indicator" *ngIf="isTyping && typingUser" [@fadeInOut]>
+      <div class="avatar">
         <div class="avatar-placeholder"></div>
       </div>
       <div class="typing-bubble">
