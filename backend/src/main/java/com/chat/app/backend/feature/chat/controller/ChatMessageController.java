@@ -4,6 +4,7 @@ import com.chat.app.backend.feature.chat.dto.MessageDTO;
 import com.chat.app.backend.feature.chat.model.MessageStatus;
 import com.chat.app.backend.feature.auth.security.UserDetailsImpl;
 import com.chat.app.backend.feature.chat.service.MessageService;
+import com.chat.app.backend.feature.chat.service.MessageSyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,9 @@ public class ChatMessageController {
 
     @Autowired
     private MessageService messageService;
+
+    @Autowired
+    private MessageSyncService messageSyncService;
 
     /**
      * Handle messages sent to a conversation.
@@ -91,6 +95,41 @@ public class ChatMessageController {
             }
         } catch (Exception e) {
             logger.error("Error in markMessagesAsRead: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Refresh message status for a conversation.
+     * This is called when a client subscribes to a conversation to ensure statuses are up-to-date.
+     *
+     * @param messageDTO the message data transfer object containing conversation ID
+     * @param authentication the authentication object containing user details
+     */
+    @MessageMapping("/chat.status.refresh")
+    public void refreshMessageStatus(@Payload MessageDTO messageDTO, Authentication authentication) {
+        if (authentication == null) {
+            logger.error("Authentication is null in refreshMessageStatus");
+            return;
+        }
+
+        try {
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            Long userId = userDetails.getId();
+
+            logger.info("Refreshing message status for user {} in conversation {}",
+                    userId, messageDTO.getConversationId());
+
+            // Process any pending messages for this user to update statuses
+            messageSyncService.processPendingMessagesForUser(userId);
+
+            // This will update all SENT messages to DELIVERED for this user in the conversation
+            // and send status updates via WebSocket
+
+            logger.info("Message status refresh complete for user {} in conversation {}",
+                    userId, messageDTO.getConversationId());
+
+        } catch (Exception e) {
+            logger.error("Error in refreshMessageStatus: {}", e.getMessage(), e);
         }
     }
 }

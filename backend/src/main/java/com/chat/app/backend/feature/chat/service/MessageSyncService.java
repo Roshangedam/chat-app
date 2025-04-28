@@ -50,56 +50,38 @@ public class MessageSyncService {
      * Scheduled task to check for messages that should be marked as delivered.
      * This runs every minute to update message status for online users.
      */
-    @Scheduled(fixedRate = 60000) // Run every minute
+    @Scheduled(fixedRate = 30000) // Run every 30 seconds instead of 60
     @Transactional
     public void updateMessageDeliveryStatus() {
         logger.info("Running scheduled message delivery status update");
 
         try {
-            // Find all online users
-            List<User> onlineUsers = userRepository.findByStatus(UserStatus.ONLINE);
+            // Find all messages with SENT status, regardless of user status
+            List<Message> pendingMessages = messageRepository.findByStatus(MessageStatus.SENT);
 
-            if (onlineUsers.isEmpty()) {
-                logger.info("No online users found, skipping delivery status update");
+            if (pendingMessages.isEmpty()) {
+                logger.info("No pending messages found, skipping delivery status update");
                 return;
             }
 
-            logger.info("Found {} online users, checking for pending messages", onlineUsers.size());
+            logger.info("Found {} pending messages to mark as delivered", pendingMessages.size());
+            LocalDateTime now = LocalDateTime.now();
 
-            // For each online user, find messages that should be marked as delivered
-            for (User user : onlineUsers) {
-                // Find messages sent to this user that are still in SENT status
-                List<Message> pendingMessages = messageRepository.findBySentToUserAndStatus(user, MessageStatus.SENT);
+            // Mark all messages as delivered
+            for (Message message : pendingMessages) {
+                // Update message status
+                message.setStatus(MessageStatus.DELIVERED);
+                message.setDeliveredAt(now);
+                messageRepository.save(message);
 
-                if (pendingMessages.isEmpty()) {
-                    continue;
-                }
+                // Send status update via WebSocket
+                MessageDTO messageDTO = messageMapper.toDTO(message);
 
-                logger.info("Found {} pending messages for user {}", pendingMessages.size(), user.getUsername());
+                // Send to conversation status topic
+                String statusDestination = "/topic/conversation." + message.getConversation().getId() + ".status";
+                messagingTemplate.convertAndSend(statusDestination, messageDTO);
 
-                LocalDateTime now = LocalDateTime.now();
-
-                // Mark messages as delivered
-                for (Message message : pendingMessages) {
-                    // Skip messages from the user themselves
-                    if (message.getSender().getId().equals(user.getId())) {
-                        continue;
-                    }
-
-                    // Update message status
-                    message.setStatus(MessageStatus.DELIVERED);
-                    message.setDeliveredAt(now);
-                    messageRepository.save(message);
-
-                    // Send status update via WebSocket
-                    MessageDTO messageDTO = messageMapper.toDTO(message);
-
-                    // Send to conversation status topic
-                    String statusDestination = "/topic/conversation." + message.getConversation().getId() + ".status";
-                    messagingTemplate.convertAndSend(statusDestination, messageDTO);
-
-                    logger.info("Updated message {} to DELIVERED for user {}", message.getId(), user.getUsername());
-                }
+                logger.info("Updated message {} to DELIVERED", message.getId());
             }
         } catch (Exception e) {
             logger.error("Error updating message delivery status: {}", e.getMessage(), e);

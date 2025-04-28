@@ -3,7 +3,7 @@ import { BehaviorSubject, Observable, Subscription, of, throwError, asyncSchedul
 import { catchError, tap, throttleTime, filter, take, finalize } from 'rxjs/operators';
 import { ChatApiService } from './chat-api.service';
 import { ChatWebsocketService } from '../websocket/chat-websocket.service';
-import { ChatMessage, ChatConversation } from '../models';
+import { ChatMessage, ChatConversation, MessageStatusUpdate } from '../models';
 
 /**
  * Main service for chat functionality.
@@ -39,6 +39,7 @@ export class ChatService implements OnDestroy {
   public typingUsers$ = this.typingUsersSubject.asObservable();
   public loading$ = this.loadingSubject.asObservable();
   public connectionStatus$: Observable<boolean>;
+  public messageStatus$: Observable<MessageStatusUpdate>;
 
   private subscriptions = new Subscription();
 
@@ -49,6 +50,9 @@ export class ChatService implements OnDestroy {
   ) {
     // Set up connection status observable
     this.connectionStatus$ = this.websocketService.connectionStatus$;
+    
+    // Set up message status observable
+    this.messageStatus$ = this.websocketService.messageStatus$;
 
     // Subscribe to WebSocket events
     this.subscribeToWebSocketEvents();
@@ -361,57 +365,108 @@ export class ChatService implements OnDestroy {
    * Handle a message status update from the WebSocket
    * @param statusUpdate The status update
    */
-  private handleMessageStatusUpdate(statusUpdate: {messageId: string | number, conversationId: string | number, status: string, deliveredAt?: Date, readAt?: Date}): void {
-    // Update the message status in the messages list
+  private handleMessageStatusUpdate(statusUpdate: MessageStatusUpdate): void {
+    console.log(`ChatService: Processing status update for message ${statusUpdate.messageId}: ${statusUpdate.status}`);
+    
+    // Get the current messages
     const currentMessages = this.messagesSubject.value;
+    
+    // Skip processing if there are no messages
+    if (currentMessages.length === 0) {
+      return;
+    }
+    
+    let hasStatusChanged = false;
+    let updatedMessages = [...currentMessages];
 
-    // Handle updates for both real and temporary messages
-    const updatedMessages = currentMessages.map(message => {
-      // Match by ID for confirmed messages
-      const isMatchById = message.id === statusUpdate.messageId;
+    // Determine if this is a broadcast update without a specific message ID
+    const isBroadcastUpdate = 
+      statusUpdate.messageId === 0 || 
+      statusUpdate.messageId === null || 
+      statusUpdate.messageId === undefined;
 
-      // For temporary messages, check if they're in the same conversation
-      // This handles the case where a temp message gets a status update before being confirmed
-      const isTempInConversation =
-        typeof message.id === 'string' &&
-        message.id.toString().startsWith('temp-') &&
-        message.conversationId === statusUpdate.conversationId;
-
-      if (isMatchById || (isTempInConversation && !this.hasHigherStatus(message.status, statusUpdate.status))) {
-        // Ensure status is one of the valid enum values
-        let validStatus: 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
-
-        switch(statusUpdate.status) {
-          case 'PENDING':
-            validStatus = 'PENDING';
-            break;
-          case 'SENT':
-            validStatus = 'SENT';
-            break;
-          case 'DELIVERED':
-            validStatus = 'DELIVERED';
-            break;
-          case 'READ':
-            validStatus = 'READ';
-            break;
-          case 'FAILED':
-            validStatus = 'FAILED';
-            break;
-          default:
-            validStatus = 'SENT'; // Default fallback
+    // Case 1: If it's a broadcast update, update all messages in the conversation
+    if (isBroadcastUpdate) {
+      updatedMessages = currentMessages.map(message => {
+        // Only update messages in the same conversation with lower status
+        if (message.conversationId === statusUpdate.conversationId && 
+            !this.hasHigherStatus(message.status, statusUpdate.status)) {
+          
+          hasStatusChanged = true;
+          return {
+            ...message,
+            status: statusUpdate.status,
+            deliveredAt: statusUpdate.deliveredAt || message.deliveredAt,
+            readAt: statusUpdate.readAt || message.readAt
+          };
         }
-
-        return {
-          ...message,
-          status: validStatus,
-          deliveredAt: statusUpdate.deliveredAt || message.deliveredAt,
-          readAt: statusUpdate.readAt || message.readAt
-        };
+        return message;
+      });
+    } 
+    // Case 2: Specific message update
+    else {
+      // Try to find the exact message by ID
+      const messageIndex = currentMessages.findIndex(m => m.id === statusUpdate.messageId);
+      
+      // If found by ID, update it
+      if (messageIndex >= 0) {
+        const message = currentMessages[messageIndex];
+        
+        // Only update if the status would actually change and isn't a downgrade
+        if (message.status !== statusUpdate.status && 
+            !this.hasHigherStatus(message.status, statusUpdate.status)) {
+          
+          console.log(`ChatService: Updating message ${message.id} status from ${message.status} to ${statusUpdate.status}`);
+          
+          // Create a new message with updated status
+          const updatedMessage = {
+            ...message,
+            status: statusUpdate.status,
+            deliveredAt: statusUpdate.deliveredAt || message.deliveredAt,
+            readAt: statusUpdate.readAt || message.readAt
+          };
+          
+          // Update the message in our array
+          updatedMessages[messageIndex] = updatedMessage;
+          hasStatusChanged = true;
+        }
+      } 
+      // If not found by ID, check for temporary messages in the same conversation
+      else {
+        const tempMessageIndex = currentMessages.findIndex(m => 
+          typeof m.id === 'string' && 
+          m.id.toString().startsWith('temp-') && 
+          m.conversationId === statusUpdate.conversationId
+        );
+        
+        if (tempMessageIndex >= 0) {
+          const tempMessage = currentMessages[tempMessageIndex];
+          
+          // Only update if this isn't a status downgrade
+          if (!this.hasHigherStatus(tempMessage.status, statusUpdate.status)) {
+            console.log(`ChatService: Updating temp message ${tempMessage.id} status from ${tempMessage.status} to ${statusUpdate.status}`);
+            
+            // Create updated message
+            const updatedMessage = {
+              ...tempMessage,
+              status: statusUpdate.status,
+              deliveredAt: statusUpdate.deliveredAt || tempMessage.deliveredAt,
+              readAt: statusUpdate.readAt || tempMessage.readAt
+            };
+            
+            // Update array
+            updatedMessages[tempMessageIndex] = updatedMessage;
+            hasStatusChanged = true;
+          }
+        }
       }
-      return message;
-    });
+    }
 
-    this.messagesSubject.next(updatedMessages);
+    // Only update the subject if changes were made
+    if (hasStatusChanged) {
+      console.log('ChatService: Emitting updated messages with new status values');
+      this.messagesSubject.next(updatedMessages);
+    }
   }
 
   /**
@@ -552,6 +607,14 @@ export class ChatService implements OnDestroy {
 
     // Reset unread count for this conversation
     this.resetUnreadCount(conversation.id);
+    
+    // Automatically mark messages as delivered/read when conversation is selected
+    if (this.websocketService.isConnected()) {
+      // This will trigger the markMessagesAsRead endpoint which will update SENT → DELIVERED → READ
+      this.markMessagesAsRead(conversation.id).subscribe({
+        error: (error) => console.error('Error marking messages as read when opening conversation:', error)
+      });
+    }
   }
 
   /**
@@ -653,10 +716,22 @@ export class ChatService implements OnDestroy {
       status: this.websocketService.isConnected() ? this.STATUS_SENT : this.STATUS_PENDING
     };
 
-    // Add to message buffer for batched updates
-    this.messageUpdateBuffer.push(tempMessage);
-
-    // Update conversation with new message
+    // IMMEDIATELY add the message to the list instead of using the buffer
+    // This ensures the message appears instantly without waiting for the buffer interval
+    const currentMessages = this.messagesSubject.value;
+    const updatedMessages = [...currentMessages, tempMessage];
+    
+    // Sort messages by date (oldest first)
+    updatedMessages.sort((a, b) => {
+      const dateA = a.sentAt ? new Date(a.sentAt).getTime() : 0;
+      const dateB = b.sentAt ? new Date(b.sentAt).getTime() : 0;
+      return dateA - dateB;
+    });
+    
+    // Update the message list immediately
+    this.messagesSubject.next(updatedMessages);
+    
+    // Still update the conversation list via buffer (less critical for immediate visibility)
     this.updateConversationWithMessageBuffered(tempMessage);
 
     // Set up a timeout to check message status and retry if needed

@@ -4,7 +4,7 @@ import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { switchMap, filter, take, retryWhen, delayWhen, tap, catchError } from 'rxjs/operators';
 import SockJS from 'sockjs-client';
 import { environment } from '../../../../../environments/environment';
-import { ChatMessage } from '../models';
+import { ChatMessage, MessageStatusUpdate } from '../models';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -20,7 +20,7 @@ export class ChatWebsocketService implements OnDestroy {
   private connectionStatusSubject = new BehaviorSubject<boolean>(false);
   public connectionStatus$: Observable<boolean> = this.connectionStatusSubject.asObservable();
   private messageReceivedSubject = new Subject<ChatMessage>();
-  private messageStatusSubject = new Subject<{messageId: string | number, conversationId: string | number, status: string, deliveredAt?: Date, readAt?: Date}>();
+  private messageStatusSubject = new Subject<MessageStatusUpdate>();
   private typingStatusSubject = new Subject<{conversationId: string | number, username: string, isTyping: boolean}>();
   private userStatusSubject = new Subject<{userId: string | number, username: string, status: string}>();
   private syncCompleteSubject = new Subject<{syncedCount: number, timestamp: number}>();
@@ -248,13 +248,17 @@ export class ChatWebsocketService implements OnDestroy {
               status = 'SENT';
             }
 
-            this.messageStatusSubject.next({
+            // Push status update to subscribers
+            const statusUpdate: MessageStatusUpdate = {
               messageId: statusData.id || 0,
               conversationId: conversationId,
-              status: status,
+              status: status as 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED',
               deliveredAt: statusData.deliveredAt ? new Date(statusData.deliveredAt) : undefined,
               readAt: statusData.readAt ? new Date(statusData.readAt) : undefined
-            });
+            };
+            this.messageStatusSubject.next(statusUpdate);
+            
+            console.log(`Received status update for message ${statusData.id}: ${status}`);
           } else {
             console.warn('Received invalid message status data');
           }
@@ -268,6 +272,17 @@ export class ChatWebsocketService implements OnDestroy {
 
     // Store the subscription
     this.subscriptions.set(destination, subscription);
+    
+    // Request immediate status updates when subscribing to a conversation
+    // This helps refresh message statuses when a user opens a conversation
+    if (this.stompClient && this.stompClient.connected) {
+      this.stompClient.publish({
+        destination: '/app/chat.status.refresh',
+        body: JSON.stringify({
+          conversationId: conversationId
+        })
+      });
+    }
   }
 
   /**
@@ -519,11 +534,12 @@ export class ChatWebsocketService implements OnDestroy {
       if (attempts >= 3) {
         console.warn(`Message ${id} exceeded retry attempts, marking as failed`);
         // Update message status to failed
-        this.messageStatusSubject.next({
+        const statusUpdate: MessageStatusUpdate = {
           messageId: id,
           conversationId: message.conversationId,
           status: 'FAILED'
-        });
+        };
+        this.messageStatusSubject.next(statusUpdate);
         this.pendingMessages.delete(id);
         continue;
       }

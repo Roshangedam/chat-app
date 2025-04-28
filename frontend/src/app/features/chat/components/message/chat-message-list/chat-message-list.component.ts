@@ -3,10 +3,11 @@ import { CommonModule } from '@angular/common';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { ChatMessage } from '../../../api/models';
+import { ChatMessage, MessageStatusUpdate } from '../../../api/models';
 import { fromEvent, Subscription, animationFrameScheduler } from 'rxjs';
 import { throttleTime, distinctUntilChanged, map } from 'rxjs/operators';
 import { ChatMessageItemComponent } from '../chat-message-item/chat-message-item.component';
+import { ChatService } from '../../../api/services/chat.service';
 
 /**
  * Component for displaying a list of chat messages.
@@ -59,12 +60,57 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
   touchStartY = 0; // Starting Y position for touch events
   mouseStartY = 0; // Starting Y position for mouse events
   isMouseDown = false; // Whether mouse is currently down
+  
+  // Add a subscription for message status updates
+  private statusSubscription = new Subscription();
 
-  constructor(private cdRef: ChangeDetectorRef, private ngZone: NgZone) {}
+  constructor(
+    private cdRef: ChangeDetectorRef, 
+    private ngZone: NgZone,
+    private chatService: ChatService
+  ) {}
 
   ngOnInit(): void {
     // Setup scroll event listener after view is initialized
     setTimeout(() => this.setupScrollListener(), 0);
+    
+    // Subscribe to message status updates
+    this.subscribeToMessageStatusUpdates();
+  }
+  
+  /**
+   * Subscribe to real-time message status updates from the chat service
+   * This ensures status changes are immediately reflected in the UI
+   */
+  private subscribeToMessageStatusUpdates(): void {
+    // Subscribe to message status updates for real-time UI updates
+    this.statusSubscription = this.chatService.messageStatus$.subscribe((statusUpdate: MessageStatusUpdate) => {
+      // Skip running the update if not currently in the component's view
+      if (!this.messages || this.messages.length === 0) return;
+      
+      console.log(`Message list received status update: ${statusUpdate.messageId} → ${statusUpdate.status}`);
+      
+      // Request change detection check to update the UI immediately
+      this.ngZone.run(() => {
+        // Status updates are automatically handled by the chat service's messages$ observable,
+        // but we need to manually trigger change detection since we're using OnPush strategy
+        this.cdRef.markForCheck();
+      });
+    });
+    
+    // Subscribe to messages observable to handle newly sent messages
+    const messagesSub = this.chatService.messages$.subscribe(messages => {
+      // If we have a new message (more messages than before), scroll to bottom
+      if (messages.length > 0 && (!this.messages || messages.length > this.messages.length)) {
+        // Use setTimeout to ensure UI has updated before scrolling
+        setTimeout(() => {
+          this.scrollToBottom();
+        }, 50);
+      }
+    });
+    
+    // Add to subscriptions for cleanup
+    this.statusSubscription.add(messagesSub);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -115,6 +161,11 @@ export class ChatMessageListComponent implements OnInit, OnChanges, OnDestroy {
     // Clean up scroll event listener
     if (this.scrollSubscription) {
       this.scrollSubscription.unsubscribe();
+    }
+    
+    // Clean up status update subscription
+    if (this.statusSubscription) {
+      this.statusSubscription.unsubscribe();
     }
 
     // Clear any running animations

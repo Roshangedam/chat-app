@@ -4,7 +4,7 @@ import { Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ChatService } from '../../api/services/chat.service';
-import { ChatMessage, ChatConversation } from '../../api/models';
+import { ChatMessage, ChatConversation, MessageStatusUpdate } from '../../api/models';
 import { ChatHeaderComponent } from '../conversation/chat-header/chat-header.component';
 import { ChatMessageListComponent } from '../message/chat-message-list/chat-message-list.component';
 import { ChatMessageInputComponent } from '../message/chat-message-input/chat-message-input.component';
@@ -77,11 +77,19 @@ export class ChatContainerComponent implements OnInit, OnDestroy {
         this.typingUser = '';
       }
     });
+    
+    // Subscribe to message status updates
+    const statusSub = this.chatService.messageStatus$.subscribe((statusUpdate: MessageStatusUpdate) => {
+      // Just subscribing ensures the updates are processed, even if we don't do anything with them here
+      // The UI will be updated automatically through the messages$ observable
+      console.log(`Container received status update: ${statusUpdate.messageId} → ${statusUpdate.status}`);
+    });
 
     // Add subscriptions to the collection
     this.subscriptions.add(messagesSub);
     this.subscriptions.add(loadingSub);
     this.subscriptions.add(typingSub);
+    this.subscriptions.add(statusSub);
 
     // Load the conversation if an ID was provided
     if (this.conversationId) {
@@ -169,6 +177,11 @@ export class ChatContainerComponent implements OnInit, OnDestroy {
         // If we received fewer messages than the page size, we've reached the end
         if (messages.length < this.pageSize) {
           this.hasMoreMessages = false;
+        }
+        
+        // Automatically mark messages as read when conversation is loaded
+        if (page === 0 && messages.length > 0 && this.conversation != null) {
+          this.chatService.markMessagesAsRead(this.conversation.id).subscribe();
         }
       },
       error: (error) => {

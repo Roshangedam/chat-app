@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,6 +8,7 @@ import { ChatMessage } from '../../../api/models';
 /**
  * Component for displaying a single chat message.
  * Handles different message styles based on sender.
+ * Uses OnPush change detection for better performance but still reacts to status changes.
  */
 @Component({
   selector: 'chat-message-item',
@@ -19,13 +20,28 @@ import { ChatMessage } from '../../../api/models';
     MatTooltipModule
   ],
   templateUrl: './chat-message-item.component.html',
-  styleUrls: ['./chat-message-item.component.css']
+  styleUrls: ['./chat-message-item.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ChatMessageItemComponent {
+export class ChatMessageItemComponent implements OnChanges {
   @Input() message!: ChatMessage;
   @Input() isOwnMessage = false;
   @Input() showAvatar = true;
   @Output() retry = new EventEmitter<string | number>();
+  
+  // Track current status for debugging
+  private currentStatus: string = '';
+  
+  ngOnChanges(changes: SimpleChanges): void {
+    // Track status changes for debugging
+    if (changes['message'] && this.isOwnMessage) {
+      const newMessage = changes['message'].currentValue;
+      if (newMessage && newMessage.status !== this.currentStatus) {
+        this.currentStatus = newMessage.status;
+        console.log(`Message ${newMessage.id} status updated to: ${newMessage.status}`);
+      }
+    }
+  }
 
   /**
    * Get the message date
