@@ -1,5 +1,5 @@
 import { HttpRequest, HttpHandlerFn, HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
-import { Observable, BehaviorSubject, throwError, of } from 'rxjs';
+import { Observable, BehaviorSubject, throwError } from 'rxjs';
 import { catchError, filter, switchMap, take, finalize } from 'rxjs/operators';
 import { inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
@@ -52,10 +52,23 @@ export const TokenInterceptor: HttpInterceptorFn = (request: HttpRequest<unknown
 
   console.log(`TokenInterceptor: Request to ${request.url}, token exists: ${!!token}`);
   if (token) {
+    // Log token format for debugging
+    const tokenParts = token.split('.');
+    console.log(`TokenInterceptor: Token format valid: ${tokenParts.length === 3}, parts: ${tokenParts.length}`);
+
     request = addToken(request, token);
     console.log(`TokenInterceptor: Added token to request for ${request.url}`);
+    console.log(`TokenInterceptor: Authorization header: Bearer ${token.substring(0, 10)}...`);
   } else {
     console.warn(`TokenInterceptor: No token available for request to ${request.url}`);
+
+    // Try to get a fresh token from localStorage
+    const freshToken = localStorage.getItem('token');
+    if (freshToken && freshToken !== token) {
+      console.log(`TokenInterceptor: Found fresh token in localStorage, using it instead`);
+      request = addToken(request, freshToken);
+      console.log(`TokenInterceptor: Added fresh token to request for ${request.url}`);
+    }
   }
 
   return next(request).pipe(

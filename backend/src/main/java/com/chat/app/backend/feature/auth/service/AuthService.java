@@ -1,19 +1,13 @@
 package com.chat.app.backend.feature.auth.service;
 
-import com.chat.app.backend.feature.auth.dto.JwtResponse;
-import com.chat.app.backend.feature.auth.dto.LoginRequest;
-import com.chat.app.backend.feature.auth.dto.SignupRequest;
-import com.chat.app.backend.feature.auth.security.JwtUtils;
-import com.chat.app.backend.feature.auth.security.UserDetailsImpl;
-import com.chat.app.backend.feature.user.model.Role;
-import com.chat.app.backend.feature.user.model.User;
-
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -21,12 +15,14 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
+import com.chat.app.backend.feature.auth.dto.JwtResponse;
+import com.chat.app.backend.feature.auth.dto.LoginRequest;
+import com.chat.app.backend.feature.auth.dto.SignupRequest;
+import com.chat.app.backend.feature.auth.security.JwtUtils;
+import com.chat.app.backend.feature.auth.security.UserDetailsImpl;
+import com.chat.app.backend.feature.chat.service.MessageSyncService;
+import com.chat.app.backend.feature.user.model.Role;
+import com.chat.app.backend.feature.user.model.User;
 import com.chat.app.backend.feature.user.model.UserStatus;
 import com.chat.app.backend.feature.user.repository.RoleRepository;
 import com.chat.app.backend.feature.user.repository.UserRepository;
@@ -56,6 +52,9 @@ public class AuthService {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+
+    @Autowired
+    private MessageSyncService messageSyncService;
 
     /**
      * Authenticate a user and generate a JWT token.
@@ -98,13 +97,11 @@ public class AuthService {
                 )
             );
 
+            // Process any pending messages for this user
+            messageSyncService.processPendingMessagesForUser(user.getId());
+
             // Generate refresh token
             String refreshToken = jwtUtils.generateRefreshToken(user);
-
-            // Get user roles
-            List<String> roles = userDetails.getAuthorities().stream()
-                    .map(item -> item.getAuthority())
-                    .collect(Collectors.toList());
 
             logger.info("User authenticated successfully: {}", userDetails.getUsername());
 

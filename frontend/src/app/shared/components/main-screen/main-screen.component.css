@@ -68,6 +68,20 @@
   position: relative;
 }
 
+/* Custom header styling */
+.chat-room-container chat-header {
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* Ensure chat container takes remaining space */
+.chat-room-container chat-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
   .welcome-screen {

@@ -1,13 +1,12 @@
 package com.chat.app.backend.feature.chat.service;
 
-import com.chat.app.backend.feature.chat.dto.MessageDTO;
-import com.chat.app.backend.feature.chat.model.Conversation;
-import com.chat.app.backend.feature.chat.model.Message;
-import com.chat.app.backend.feature.chat.model.MessageStatus;
-import com.chat.app.backend.feature.chat.repository.ConversationRepository;
-import com.chat.app.backend.feature.chat.repository.MessageRepository;
-import com.chat.app.backend.feature.user.model.User;
-import com.chat.app.backend.feature.user.repository.UserRepository;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,16 +17,23 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
+import com.chat.app.backend.feature.chat.dto.MessageDTO;
+import com.chat.app.backend.feature.chat.model.Conversation;
+import com.chat.app.backend.feature.chat.model.Message;
+import com.chat.app.backend.feature.chat.model.MessageStatus;
+import com.chat.app.backend.feature.chat.repository.ConversationRepository;
+import com.chat.app.backend.feature.chat.repository.MessageRepository;
+import com.chat.app.backend.feature.user.model.User;
+import com.chat.app.backend.feature.user.repository.UserRepository;
 
 /**
  * Service for message operations.
  */
 @Service
 public class MessageService {
+
+    private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     @Autowired
     private MessageRepository messageRepository;
@@ -42,7 +48,10 @@ public class MessageService {
     private SimpMessagingTemplate messagingTemplate;
 
     @Autowired
-    private KafkaTemplate<String, MessageDTO> kafkaTemplate;
+    private KafkaTemplate<String, Object> objectKafkaTemplate;
+
+    @Autowired
+    private MessageMapper messageMapper;
 
     /**
      * Send a new message in a conversation.
@@ -73,15 +82,16 @@ public class MessageService {
             throw new RuntimeException("User is not a participant in this conversation");
         }
 
-        // Create and save the message
+        // Create the message with initial SENT status
         Message message = new Message(sender, conversation, content);
+        message.setStatus(MessageStatus.SENT);
         Message savedMessage = messageRepository.save(message);
 
         // Convert to DTO for response
-        MessageDTO messageDTO = convertToDTO(savedMessage);
+        MessageDTO messageDTO = messageMapper.toDTO(savedMessage);
 
         // Send message to Kafka topic for distribution
-        kafkaTemplate.send("chat-messages", messageDTO);
+        objectKafkaTemplate.send("chat-messages", messageDTO);
 
         // Send message to WebSocket subscribers
         String destination = "/topic/conversation." + conversationId;
@@ -110,13 +120,23 @@ public class MessageService {
         }
 
         Conversation conversation = conversationOpt.get();
-        // Use ascending order (oldest to newest) for better display in chat UI
-        Pageable pageable = PageRequest.of(page, size, Sort.by("sentAt").ascending());
+
+        // Log the request parameters
+        System.out.println("Loading messages for conversation " + conversationId + ", page " + page + ", size " + size);
+
+        // Always use descending order (newest first) for initial load
+        // This matches WhatsApp behavior where newest messages are shown first
+        // and older messages are loaded when scrolling up
+        Pageable pageable = PageRequest.of(page, size, Sort.by("sentAt").descending());
 
         // Use the repository method that matches our sort order
-        Page<Message> messages = messageRepository.findByConversationOrderBySentAtAsc(conversation, pageable);
+        Page<Message> messages = messageRepository.findByConversationOrderBySentAtDesc(conversation, pageable);
 
-        return messages.map(this::convertToDTO);
+        // Log the result
+        System.out.println("Found " + messages.getContent().size() + " messages, total elements: " +
+                          messages.getTotalElements() + ", total pages: " + messages.getTotalPages());
+
+        return messages.map(messageMapper::toDTO);
     }
 
     /**
@@ -150,10 +170,30 @@ public class MessageService {
         for (Message message : unreadMessages) {
             message.setReadAt(now);
             message.setStatus(MessageStatus.READ);
+
+            // If the message was never marked as delivered, mark it now
+            if (message.getDeliveredAt() == null) {
+                message.setDeliveredAt(now);
+            }
         }
 
         if (!unreadMessages.isEmpty()) {
             messageRepository.saveAll(unreadMessages);
+
+            // Send individual status updates for each message
+            for (Message message : unreadMessages) {
+                // Create a status update DTO
+                MessageDTO statusUpdate = new MessageDTO();
+                statusUpdate.setId(message.getId());
+                statusUpdate.setConversationId(message.getConversation().getId());
+                statusUpdate.setStatus(MessageStatus.READ);
+                statusUpdate.setReadAt(message.getReadAt());
+                statusUpdate.setDeliveredAt(message.getDeliveredAt());
+
+                // Send to the conversation status topic
+                String destination = "/topic/conversation." + message.getConversation().getId() + ".status";
+                messagingTemplate.convertAndSend(destination, statusUpdate);
+            }
         }
 
         return unreadMessages.size();
@@ -189,36 +229,71 @@ public class MessageService {
     public List<MessageDTO> getLatestMessagesForUser(Long userId) {
         List<Message> latestMessages = messageRepository.findLatestMessagesForUser(userId);
         return latestMessages.stream()
-                .map(this::convertToDTO)
+                .map(messageMapper::toDTO)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Convert a Message entity to a MessageDTO.
+     * Process pending messages for a user who has just come online.
+     * This updates the status of messages that were sent while the user was offline.
      *
-     * @param message the message entity
-     * @return the message DTO
+     * @param userId the ID of the user who came online
      */
-    private MessageDTO convertToDTO(Message message) {
-        MessageDTO dto = new MessageDTO();
-        dto.setId(message.getId());
-
-        if (message.getSender() != null) {
-            dto.setSenderId(message.getSender().getId());
-            dto.setSenderUsername(message.getSender().getUsername());
-            dto.setSenderAvatarUrl(message.getSender().getAvatarUrl());
+    @Transactional
+    public void processPendingMessagesForUser(Long userId) {
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return;
         }
 
-        if (message.getConversation() != null) {
-            dto.setConversationId(message.getConversation().getId());
+        User user = userOpt.get();
+
+        // Find all conversations where the user is a participant
+        List<Conversation> userConversations = conversationRepository.findByParticipant(user);
+
+        for (Conversation conversation : userConversations) {
+            // Find messages that are still in SENT status (not yet DELIVERED)
+            List<Message> pendingMessages = messageRepository.findPendingMessagesForUser(conversation, user);
+
+            if (!pendingMessages.isEmpty()) {
+                LocalDateTime now = LocalDateTime.now();
+
+                // Filter out messages sent by this user
+                List<Message> messagesToUpdate = pendingMessages.stream()
+                        .filter(message -> !message.getSender().getId().equals(userId))
+                        .collect(Collectors.toList());
+
+                if (!messagesToUpdate.isEmpty()) {
+                    // Update all pending messages to DELIVERED status
+                    for (Message message : messagesToUpdate) {
+                        message.setDeliveredAt(now);
+                        message.setStatus(MessageStatus.DELIVERED);
+                    }
+
+                    // Save all updated messages
+                    messageRepository.saveAll(messagesToUpdate);
+
+                    // Notify the sender about the delivery status update
+                    for (Message message : messagesToUpdate) {
+                        // Send status update via WebSocket
+                        MessageDTO statusUpdate = new MessageDTO();
+                        statusUpdate.setId(message.getId());
+                        statusUpdate.setConversationId(message.getConversation().getId());
+                        statusUpdate.setStatus(MessageStatus.DELIVERED);
+                        statusUpdate.setDeliveredAt(message.getDeliveredAt());
+
+                        // Send to the conversation status topic
+                        String destination = "/topic/conversation." + message.getConversation().getId() + ".status";
+                        messagingTemplate.convertAndSend(destination, statusUpdate);
+
+                        // Also send to the main conversation topic to ensure all clients get the update
+                        String mainDestination = "/topic/conversation." + message.getConversation().getId();
+                        messagingTemplate.convertAndSend(mainDestination, messageMapper.toDTO(message));
+                    }
+                }
+            }
         }
-
-        dto.setContent(message.getContent());
-        dto.setSentAt(message.getSentAt());
-        dto.setDeliveredAt(message.getDeliveredAt());
-        dto.setReadAt(message.getReadAt());
-        dto.setStatus(message.getStatus());
-
-        return dto;
     }
+
+
 }

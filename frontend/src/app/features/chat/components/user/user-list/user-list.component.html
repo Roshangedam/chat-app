@@ -6,7 +6,7 @@
       <input
         matInput
         [(ngModel)]="searchQuery"
-        (keyup.enter)="searchUsers()"
+        (keyup)="onSearchInput()"
         placeholder="Enter username">
       <button
         *ngIf="searchQuery"
@@ -45,13 +45,15 @@
 
   <!-- User List -->
   <mat-list *ngIf="!isLoading && !error && filteredUsers.length > 0">
-    <div class="user-item" *ngFor="let user of filteredUsers">
+    <div class="user-item" *ngFor="let user of filteredUsers; trackBy: trackByUserId">
       <mat-list-item (click)="onStartChat(user)">
         <div class="user-avatar">
-          <img
-            [src]="user.avatarUrl || 'assets/images/user-avatar.png'"
-            alt="{{ user.username }}'s avatar">
-          <app-status-indicator [userId]="user.id"></app-status-indicator>
+          <app-user-avatar
+            [userId]="user.id"
+            [avatarUrl]="user.avatarUrl || null"
+            [altText]="user.username + '\'s avatar'"
+            [clickable]="true">
+          </app-user-avatar>
         </div>
         <div class="user-info">
           <h3 class="user-name">{{ user.fullName || user.username }}</h3>

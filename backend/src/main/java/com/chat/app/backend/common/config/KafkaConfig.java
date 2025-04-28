@@ -1,6 +1,7 @@
 package com.chat.app.backend.common.config;
 
-import com.chat.app.backend.feature.chat.dto.MessageDTO;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -13,12 +14,16 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.*;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaAdmin;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.chat.app.backend.feature.chat.dto.MessageDTO;
 
 /**
  * Kafka Configuration.
@@ -57,12 +62,12 @@ public class KafkaConfig {
     }
 
     /**
-     * Kafka producer factory configuration.
+     * Kafka producer factory configuration for MessageDTO.
      *
-     * @return the Kafka producer factory
+     * @return the Kafka producer factory for MessageDTO
      */
     @Bean
-    public ProducerFactory<String, MessageDTO> producerFactory() {
+    public ProducerFactory<String, MessageDTO> messageDtoProducerFactory() {
         Map<String, Object> configProps = new HashMap<>();
         configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -71,13 +76,37 @@ public class KafkaConfig {
     }
 
     /**
-     * Kafka template configuration.
+     * Kafka template configuration for MessageDTO.
      *
-     * @return the Kafka template
+     * @return the Kafka template for MessageDTO
      */
     @Bean
     public KafkaTemplate<String, MessageDTO> kafkaTemplate() {
-        return new KafkaTemplate<>(producerFactory());
+        return new KafkaTemplate<>(messageDtoProducerFactory());
+    }
+
+    /**
+     * Kafka producer factory configuration for generic objects.
+     *
+     * @return the Kafka producer factory for generic objects
+     */
+    @Bean
+    public ProducerFactory<String, Object> objectProducerFactory() {
+        Map<String, Object> configProps = new HashMap<>();
+        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        return new DefaultKafkaProducerFactory<>(configProps);
+    }
+
+    /**
+     * Kafka template configuration for generic objects.
+     *
+     * @return the Kafka template for generic objects
+     */
+    @Bean(name = "objectKafkaTemplate")
+    public KafkaTemplate<String, Object> objectKafkaTemplate() {
+        return new KafkaTemplate<>(objectProducerFactory());
     }
 
     /**
@@ -92,7 +121,7 @@ public class KafkaConfig {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.chat.app.backend.dto");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.chat.app.backend.feature.chat.dto");
         return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(),
                 new JsonDeserializer<>(MessageDTO.class, false));
     }

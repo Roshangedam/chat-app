@@ -25,9 +25,9 @@
         <span>New</span>
       </button>
     </div>
-    
+
     <div class="conversation-items">
-      <div *ngFor="let conversation of conversations" 
+      <div *ngFor="let conversation of conversations"
            class="conversation-item"
            [class.selected]="conversation.id === selectedConversationId"
            (click)="selectConversation(conversation)">

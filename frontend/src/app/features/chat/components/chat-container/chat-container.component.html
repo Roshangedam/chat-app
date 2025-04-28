@@ -14,7 +14,10 @@
     [loading]="isLoading"
     [isTyping]="isTyping"
     [typingUser]="typingUser"
-    [userId]="userId">
+    [userId]="userId"
+    [hasMoreMessages]="hasMoreMessages"
+    (loadOlderMessages)="onLoadOlderMessages()"
+    (retryMessage)="onRetryMessage($event)">
   </chat-message-list>
 
   <!-- Message Input -->

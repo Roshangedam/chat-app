@@ -1,7 +1,9 @@
 package com.chat.app.backend.common.config;
 
-import com.chat.app.backend.feature.auth.websocket.WebSocketAuthChannelInterceptor;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.http.server.ServerHttpRequest;
@@ -9,13 +11,15 @@ import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
-import java.util.Map;
+import com.chat.app.backend.feature.auth.websocket.WebSocketAuthChannelInterceptor;
 
 /**
  * WebSocket Configuration.
@@ -39,13 +43,41 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         // Enable a simple in-memory message broker to carry messages back to the client on destinations prefixed with /topic
-        config.enableSimpleBroker("/topic", "/queue");
+        config.enableSimpleBroker("/topic", "/queue")
+              .setHeartbeatValue(new long[]{10000, 10000}) // 10 second heartbeat
+              .setTaskScheduler(taskScheduler()); // Use task scheduler for heartbeats
 
         // Set prefix for messages bound for @MessageMapping methods
         config.setApplicationDestinationPrefixes("/app");
 
         // Set prefix for user-specific messages
         config.setUserDestinationPrefix("/user");
+    }
+
+    /**
+     * Configure WebSocket transport options.
+     *
+     * @param registration the WebSocketTransportRegistration to configure
+     */
+    @Override
+    public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+        registration.setSendTimeLimit(15 * 1000) // 15 seconds
+                   .setSendBufferSizeLimit(512 * 1024) // 512KB
+                   .setMessageSizeLimit(128 * 1024); // 128KB
+    }
+
+    /**
+     * Create a task scheduler for heartbeats.
+     *
+     * @return the task scheduler
+     */
+    @Bean
+    public ThreadPoolTaskScheduler taskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(2);
+        scheduler.setThreadNamePrefix("ws-heartbeat-");
+        scheduler.initialize();
+        return scheduler;
     }
 
     /**

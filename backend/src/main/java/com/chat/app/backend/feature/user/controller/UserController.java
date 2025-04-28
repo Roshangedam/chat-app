@@ -1,20 +1,29 @@
 package com.chat.app.backend.feature.user.controller;
 
-import com.chat.app.backend.feature.user.dto.UserDTO;
-import com.chat.app.backend.feature.user.model.User;
-import com.chat.app.backend.feature.user.model.UserStatus;
-import com.chat.app.backend.feature.user.repository.UserRepository;
-import com.chat.app.backend.feature.auth.security.UserDetailsImpl;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.chat.app.backend.feature.auth.security.UserDetailsImpl;
+import com.chat.app.backend.feature.chat.service.MessageSyncService;
+import com.chat.app.backend.feature.user.dto.UserDTO;
+import com.chat.app.backend.feature.user.model.User;
+import com.chat.app.backend.feature.user.model.UserStatus;
+import com.chat.app.backend.feature.user.repository.UserRepository;
 
 /**
  * REST Controller for user operations.
@@ -29,6 +38,9 @@ public class UserController {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+
+    @Autowired
+    private MessageSyncService messageSyncService;
 
     /**
      * Get all users except the current user.
@@ -128,6 +140,11 @@ public class UserController {
                 savedUser.getStatus()
             )
         );
+
+        // If user is coming online, process pending messages
+        if (UserStatus.ONLINE.equals(status.getStatus())) {
+            messageSyncService.processPendingMessagesForUser(userId);
+        }
 
         return ResponseEntity.ok(userDTO);
     }

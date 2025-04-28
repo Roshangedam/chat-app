@@ -17,9 +17,16 @@
       <div class="message-time">
         {{ getMessageDate() | date:'shortTime' }}
         <span class="message-status" *ngIf="isOwnMessage">
+          <mat-icon *ngIf="message.status === 'PENDING'" class="status-icon pending">schedule</mat-icon>
           <mat-icon *ngIf="message.status === 'SENT'" class="status-icon">done</mat-icon>
           <mat-icon *ngIf="message.status === 'DELIVERED'" class="status-icon">done_all</mat-icon>
           <mat-icon *ngIf="message.status === 'READ'" class="status-icon read">done_all</mat-icon>
+          <span *ngIf="message.status === 'FAILED'" class="failed-message-container">
+            <mat-icon class="status-icon failed">error_outline</mat-icon>
+            <button mat-icon-button class="retry-button" (click)="retryMessage($event)" matTooltip="Retry sending message">
+              <mat-icon>refresh</mat-icon>
+            </button>
+          </span>
         </span>
       </div>
     </div>

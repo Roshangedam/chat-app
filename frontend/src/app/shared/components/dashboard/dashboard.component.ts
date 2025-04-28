@@ -16,24 +16,20 @@ import { MatInputModule } from '@angular/material/input';
 // Import the user list component
 import { UserListComponent } from '../../../features/chat/components/user/user-list/user-list.component';
 import { UserService } from '../../../features/chat/api/services/user.service';
-import { ChatUser } from '../../../features/chat/api/models';
 import { Subscription } from 'rxjs';
 
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { TopTabsComponent } from '../top-tabs/top-tabs.component';
 import { ListViewComponent } from '../list-view/list-view.component';
 import { MainScreenComponent } from '../main-screen/main-screen.component';
+import { ChatHeaderComponent } from '../../../features/chat/components/conversation/chat-header/chat-header.component';
 
 import { ResponsiveUtils } from '../../utils/responsive.utils';
-import { Section } from '../../../features/chat/models/section.model';
 import { AuthService } from '../../../core/auth/services/auth.service';
-// Import the new chat service and models
-import { ChatService as NewChatService } from '../../../features/chat/api/services/chat.service';
-import { ChatConversation } from '../../../features/chat/api/models';
-// Keep the old service for backward compatibility during transition
-import { ChatService, Conversation } from '../../../features/chat/services/chat.service';
-// Import the model conversation for type compatibility
-import { Conversation as ModelConversation } from '../../../features/chat/models/conversation.model';
+// Import the chat service and models
+import { ChatService } from '../../../features/chat/api/services/chat.service';
+import { ChatConversation, ChatUser } from '../../../features/chat/api/models';
+import { Section } from '../../../features/chat/models/section.model';
 
 @Component({
   selector: 'app-dashboard',
@@ -56,7 +52,8 @@ import { Conversation as ModelConversation } from '../../../features/chat/models
     TopTabsComponent,
     ListViewComponent,
     MainScreenComponent,
-    UserListComponent
+    UserListComponent,
+    ChatHeaderComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
@@ -64,7 +61,7 @@ import { Conversation as ModelConversation } from '../../../features/chat/models
 export class DashboardComponent implements OnInit, OnDestroy {
 
   activeSection: string = 'chats';
-  activeConversation: Conversation | null = null;
+  activeConversation: ChatConversation | null = null;
   sections: Section[] = [
     { id: 'chats', icon: 'chat', label: 'Chats' },
     { id: 'contacts', icon: 'contacts', label: 'Contacts' },
@@ -95,7 +92,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private router: Router,
     private authService: AuthService,
     private chatService: ChatService,
-    private newChatService: NewChatService,
     private userService: UserService
   ) {}
 
@@ -113,20 +109,50 @@ export class DashboardComponent implements OnInit, OnDestroy {
       // Get current user information
       this.currentUser = this.authService.getCurrentUser();
 
-      // Initialize the new chat service with the auth token
+      // Initialize the chat service with the auth token
       const token = localStorage.getItem('token');
+      console.log('Dashboard: Token from localStorage:', token ? 'Token exists' : 'No token');
+
       if (token) {
-        this.newChatService.initialize(token);
+        console.log('Dashboard: Initializing chat service with token');
+        this.chatService.initialize(token);
 
         // Load users for the chat feature
-        this.userService.loadUsers().subscribe();
+        console.log('Dashboard: Loading users');
+        this.userService.loadUsers().subscribe({
+          next: (users) => console.log(`Dashboard: Loaded ${users.length} users`),
+          error: (err) => console.error('Dashboard: Error loading users:', err)
+        });
+
+        // Load conversations
+        console.log('Dashboard: Loading conversations');
+        this.chatService.loadConversations().subscribe({
+          next: (conversations) => console.log(`Dashboard: Loaded ${conversations.length} conversations`),
+          error: (err) => console.error('Dashboard: Error loading conversations:', err)
+        });
+      } else {
+        console.error('Dashboard: No token available, cannot initialize chat service');
+        // Try to get a new token by refreshing
+        this.authService.refreshToken().subscribe({
+          next: () => {
+            console.log('Dashboard: Token refreshed successfully');
+            const newToken = localStorage.getItem('token');
+            if (newToken) {
+              console.log('Dashboard: Initializing chat service with new token');
+              this.chatService.initialize(newToken);
+
+              // Load users and conversations with the new token
+              this.userService.loadUsers().subscribe();
+              this.chatService.loadConversations().subscribe();
+            }
+          },
+          error: (err) => {
+            console.error('Dashboard: Error refreshing token:', err);
+            // Redirect to login if token refresh fails
+            this.router.navigate(['/auth/login']);
+          }
+        });
       }
-
-      // Load conversations using the new chat service
-      this.newChatService.loadConversations().subscribe();
-
-      // Also load conversations using the old service for backward compatibility
-      this.chatService.getConversations().subscribe();
 
       // Check if we have a conversation ID in the route params or query params
       const routeSub = this.route.paramMap.subscribe(params => {
@@ -162,25 +188,51 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   onConversationSelected(conversation: any): void {
-    // Convert to the expected Conversation type
-    const typedConversation = this.convertToServiceConversation(conversation);
-    this.activeConversation = typedConversation;
+    console.log(`Dashboard: Conversation selected: ${conversation.id}`);
 
-    // Set the active conversation in the new chat service
-    this.newChatService.getConversation(typedConversation.id).subscribe(chatConversation => {
-      this.newChatService.setActiveConversation(chatConversation);
+    // Set the conversation as active
+    this.activeConversation = conversation;
+
+    // Set the active conversation in the chat service
+    console.log(`Dashboard: Getting conversation details for: ${conversation.id}`);
+    this.chatService.getConversation(conversation.id).subscribe({
+      next: (chatConversation) => {
+        console.log(`Dashboard: Got conversation details for: ${chatConversation.id}`);
+        this.chatService.setActiveConversation(chatConversation);
+
+        // Navigate to the conversation route
+        this.router.navigate(['/dashboard'], { queryParams: { conversationId: conversation.id } });
+
+        // Load messages
+        console.log(`Dashboard: Loading messages for conversation: ${chatConversation.id}`);
+        this.chatService.loadMessages().subscribe({
+          next: (messages) => console.log(`Dashboard: Loaded ${messages.length} messages`),
+          error: (err) => console.error(`Dashboard: Error loading messages:`, err)
+        });
+      },
+      error: (err) => {
+        console.error(`Dashboard: Error getting conversation details for ${conversation.id}:`, err);
+
+        // Check if it's an authentication error
+        if (err.status === 401) {
+          console.log('Dashboard: Authentication error, refreshing token');
+
+          // Try to refresh the token
+          this.authService.refreshToken().subscribe({
+            next: () => {
+              console.log('Dashboard: Token refreshed successfully, retrying conversation selection');
+              // Retry selecting the conversation with the new token
+              this.onConversationSelected(conversation);
+            },
+            error: (refreshErr) => {
+              console.error('Dashboard: Error refreshing token:', refreshErr);
+              // Redirect to login if token refresh fails
+              this.router.navigate(['/auth/login']);
+            }
+          });
+        }
+      }
     });
-
-    // Navigate to the conversation route
-    this.router.navigate(['/dashboard'], { queryParams: { conversationId: typedConversation.id } });
-
-    // Load messages using both services for backward compatibility
-    if (typeof typedConversation.id === 'string') {
-      this.chatService.loadMessages(parseInt(typedConversation.id)).subscribe();
-    } else {
-      this.chatService.loadMessages(typedConversation.id as number).subscribe();
-    }
-    this.newChatService.loadMessages().subscribe();
   }
 
   /**
@@ -188,7 +240,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
    */
   onBackClicked(): void {
     this.activeConversation = null;
-    this.newChatService.setActiveConversation(null);
+    this.chatService.setActiveConversation(null);
     this.router.navigate(['/dashboard']);
   }
 
@@ -197,22 +249,48 @@ export class DashboardComponent implements OnInit, OnDestroy {
    * @param conversationId The ID of the conversation to load
    */
   private loadConversationById(conversationId: string): void {
-    // Load the conversation using the new chat service
-    this.newChatService.getConversation(conversationId).subscribe(conversation => {
-      // Set as active in the new chat service
-      this.newChatService.setActiveConversation(conversation);
+    console.log(`Dashboard: Loading conversation by ID: ${conversationId}`);
 
-      // Convert the conversation type for the old components
-      this.activeConversation = {
-        ...conversation,
-        id: String(conversation.id),
-        participants: conversation.participants || [],
-        createdAt: conversation.createdAt ? new Date(conversation.createdAt) : undefined,
-        updatedAt: conversation.updatedAt ? new Date(conversation.updatedAt) : undefined
-      } as unknown as Conversation;
+    // Load the conversation
+    this.chatService.getConversation(conversationId).subscribe({
+      next: (conversation) => {
+        console.log(`Dashboard: Loaded conversation: ${conversation.id}`);
 
-      // Load messages
-      this.newChatService.loadMessages().subscribe();
+        // Set as active in the chat service
+        this.chatService.setActiveConversation(conversation);
+
+        // Set as active conversation
+        this.activeConversation = conversation;
+
+        // Load messages
+        console.log(`Dashboard: Loading messages for conversation: ${conversation.id}`);
+        this.chatService.loadMessages().subscribe({
+          next: (messages) => console.log(`Dashboard: Loaded ${messages.length} messages`),
+          error: (err) => console.error(`Dashboard: Error loading messages:`, err)
+        });
+      },
+      error: (err) => {
+        console.error(`Dashboard: Error loading conversation ${conversationId}:`, err);
+
+        // Check if it's an authentication error
+        if (err.status === 401) {
+          console.log('Dashboard: Authentication error, refreshing token');
+
+          // Try to refresh the token
+          this.authService.refreshToken().subscribe({
+            next: () => {
+              console.log('Dashboard: Token refreshed successfully, retrying conversation load');
+              // Retry loading the conversation with the new token
+              this.loadConversationById(conversationId);
+            },
+            error: (refreshErr) => {
+              console.error('Dashboard: Error refreshing token:', refreshErr);
+              // Redirect to login if token refresh fails
+              this.router.navigate(['/auth/login']);
+            }
+          });
+        }
+      }
     });
   }
 
@@ -222,24 +300,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
    */
   onStartChat(user: ChatUser): void {
     // Create a one-to-one conversation
-    this.newChatService.createOneToOneConversation(user.id).subscribe({
+    this.chatService.createOneToOneConversation(user.id).subscribe({
       next: (conversation) => {
         // Set as active conversation
-        this.newChatService.setActiveConversation(conversation);
-
-        // Convert to old format for backward compatibility
-        this.activeConversation = {
-          id: String(conversation.id),
-          name: conversation.name,
-          description: conversation.description,
-          avatarUrl: conversation.avatarUrl,
-          groupChat: conversation.groupChat,
-          creatorId: Number(conversation.creatorId),
-          creatorUsername: conversation.creatorUsername,
-          participants: conversation.participants || [],
-          createdAt: conversation.createdAt ? new Date(conversation.createdAt) : undefined,
-          updatedAt: conversation.updatedAt ? new Date(conversation.updatedAt) : undefined
-        } as unknown as Conversation;
+        this.chatService.setActiveConversation(conversation);
+        this.activeConversation = conversation;
       },
       error: (err) => {
         console.error('Error creating conversation:', err);
@@ -381,38 +446,33 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Convert any conversation model to the service Conversation type
-   * This ensures type compatibility between different conversation models
+   * Handle menu actions from the chat header
+   * @param action The action to perform
    */
-  private convertToServiceConversation(conversation: any): Conversation {
-    // If it's already the right type, return it
-    if (conversation && typeof conversation === 'object') {
-      // Create a new object with the expected properties
-      const result: Conversation = {
-        id: conversation.id,
-        name: conversation.name || '',
-        description: conversation.description,
-        avatarUrl: conversation.avatarUrl,
-        groupChat: !!conversation.groupChat,
-        creatorId: conversation.creatorId ? Number(conversation.creatorId) : undefined,
-        creatorUsername: conversation.creatorUsername,
-        participants: conversation.participants || [],
-        // Convert string dates to Date objects
-        createdAt: conversation.createdAt ?
-          (typeof conversation.createdAt === 'string' ? new Date(conversation.createdAt) : conversation.createdAt) :
-          undefined,
-        updatedAt: conversation.updatedAt ?
-          (typeof conversation.updatedAt === 'string' ? new Date(conversation.updatedAt) : conversation.updatedAt) :
-          undefined
-      };
-      return result;
+  onMenuAction(action: string): void {
+    console.log(`Dashboard: Menu action: ${action}`);
+
+    switch (action) {
+      case 'search':
+        // Implement search functionality
+        console.log('Dashboard: Search action');
+        break;
+      case 'participants':
+        // Show participants for group chats
+        console.log('Dashboard: View participants action');
+        break;
+      case 'mute':
+        // Mute notifications for this conversation
+        console.log('Dashboard: Mute notifications action');
+        break;
+      case 'voice-call':
+        this.startVoiceCall();
+        break;
+      case 'video-call':
+        this.startVideoCall();
+        break;
+      default:
+        console.log(`Dashboard: Unknown menu action: ${action}`);
     }
-    // If it's not an object, return a default conversation
-    return {
-      id: '0',
-      name: 'Unknown Conversation',
-      groupChat: false,
-      participants: []
-    };
   }
 }

@@ -11,14 +11,13 @@ import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subscription } from 'rxjs';
 
-import { ChatService } from '../../../features/chat/services/chat.service';
 import { AuthService } from '../../../core/auth/services/auth.service';
 import { DateFormatterUtils } from '../../utils/date-formatter.utils';
 import { User } from '../../../core/auth/services/auth.service';
-// Import the new chat service for future migration
-import { ChatService as NewChatService } from '../../../features/chat/api/services/chat.service';
+import { ChatService } from '../../../features/chat/api/services/chat.service';
 import { UserStatusService } from '../../../features/chat/api/services/user-status.service';
 import { StatusIndicatorComponent } from '../status-indicator/status-indicator.component';
+import { UserAvatarComponent } from '../user-avatar/user-avatar.component';
 
 @Component({
   selector: 'app-list-view',
@@ -34,7 +33,8 @@ import { StatusIndicatorComponent } from '../status-indicator/status-indicator.c
     MatDividerModule,
     MatBadgeModule,
     MatTooltipModule,
-    StatusIndicatorComponent
+    StatusIndicatorComponent,
+    UserAvatarComponent
   ],
   templateUrl: './list-view.component.html',
   styleUrls: ['./list-view.component.css']
@@ -60,13 +60,12 @@ export class ListViewComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.chatService.conversations$.subscribe(conversations => {
         // Just store the conversations as they are
-        // The conversion will happen in the dashboard component
         this.conversations = conversations;
       })
     );
 
     // Load conversations
-    this.chatService.getConversations().subscribe();
+    this.chatService.loadConversations().subscribe();
 
     // Subscribe to user status updates
     this.userStatusService.subscribeToUserStatus();
@@ -107,14 +106,19 @@ export class ListViewComponent implements OnInit, OnDestroy {
   }
 
   onConversationClick(conversation: any): void {
-    this.conversationSelected.emit(conversation);
+    // If this is a grouped conversation, we need to emit the most recent actual conversation
+    if (conversation._isGrouped && conversation._originalConversations) {
+      // The first conversation in the array is the most recent one
+      this.conversationSelected.emit(conversation._originalConversations[0]);
+    } else {
+      this.conversationSelected.emit(conversation);
+    }
   }
 
   onContactClick(contact: User): void {
     // Create a one-to-one conversation with this contact
     this.chatService.createOneToOneConversation(contact.id).subscribe(conversation => {
-      // Just emit the conversation as is
-      // The conversion will happen in the dashboard component
+      // Emit the conversation
       this.conversationSelected.emit(conversation);
     });
   }
@@ -124,7 +128,8 @@ export class ListViewComponent implements OnInit, OnDestroy {
 
     switch (this.activeSection) {
       case 'chats':
-        items = this.conversations;
+        // Group one-to-one conversations by participant
+        items = this.groupConversationsByParticipant(this.conversations.filter(c => !c.groupChat));
         break;
       case 'contacts':
       case 'people':
@@ -166,6 +171,11 @@ export class ListViewComponent implements OnInit, OnDestroy {
     const currentUser = this.authService.getCurrentUser();
     if (!currentUser) return conversation.name;
 
+    // If this is a grouped conversation, use the participant info we stored
+    if (conversation._isGrouped && conversation._otherParticipant) {
+      return conversation._otherParticipant.fullName || conversation._otherParticipant.username;
+    }
+
     const otherParticipant = conversation.participants.find((p: any) => p.id !== currentUser.id);
     return otherParticipant ? (otherParticipant.fullName || otherParticipant.username) : conversation.name;
   }
@@ -176,6 +186,45 @@ export class ListViewComponent implements OnInit, OnDestroy {
     } else {
       return item.avatarUrl || 'assets/images/default-avatar.png';
     }
+  }
+
+  /**
+   * Get the last message preview for a conversation
+   * @param conversation The conversation
+   * @returns A preview of the last message
+   */
+  getLastMessagePreview(conversation: any): string {
+    // If this is a grouped conversation, use the most recent message
+    if (conversation._isGrouped && conversation._originalConversations && conversation._originalConversations.length > 0) {
+      const mostRecentConversation = conversation._originalConversations[0];
+      return this.extractMessageContent(mostRecentConversation.lastMessage);
+    }
+
+    return this.extractMessageContent(conversation.lastMessage);
+  }
+
+  /**
+   * Extract the content from a message object or return a default message
+   * @param message The message object or string
+   * @returns The message content as a string
+   */
+  private extractMessageContent(message: any): string {
+    if (!message) {
+      return 'No messages yet';
+    }
+
+    // If message is a string, return it directly
+    if (typeof message === 'string') {
+      return message;
+    }
+
+    // If message is an object with a content property, return that
+    if (message && typeof message === 'object' && message.content) {
+      return message.content;
+    }
+
+    // Fallback for any other case
+    return 'No messages yet';
   }
 
   getUserStatus(user: User): string {
@@ -191,6 +240,16 @@ export class ListViewComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Track function for ngFor to improve performance
+   * @param index Index of the item
+   * @param item The item itself
+   * @returns A unique identifier for the item
+   */
+  trackById(index: number, item: any): string | number {
+    return item.id || index;
+  }
+
+  /**
    * Get the other participant in a one-to-one conversation
    * @param conversation The conversation
    * @returns The other participant or null if not found
@@ -198,6 +257,11 @@ export class ListViewComponent implements OnInit, OnDestroy {
   getOtherParticipant(conversation: any): User | null {
     if (!conversation || conversation.groupChat || !conversation.participants) {
       return null;
+    }
+
+    // If this is a grouped conversation, use the participant info we stored
+    if (conversation._isGrouped && conversation._otherParticipant) {
+      return conversation._otherParticipant;
     }
 
     const currentUser = this.authService.getCurrentUser();
@@ -209,5 +273,95 @@ export class ListViewComponent implements OnInit, OnDestroy {
   createNewGroup(): void {
     // This would typically open a dialog to create a new group
     console.log('Create new group');
+  }
+
+  /**
+   * Group one-to-one conversations by participant to avoid showing multiple entries
+   * for the same contact in the chat list
+   * @param conversations List of one-to-one conversations
+   * @returns List of grouped conversations
+   */
+  private groupConversationsByParticipant(conversations: any[]): any[] {
+    if (!conversations || conversations.length === 0) {
+      return [];
+    }
+
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser) {
+      return conversations;
+    }
+
+    // Create a map to group conversations by the other participant's ID
+    const conversationsByParticipant = new Map<number | string, any[]>();
+
+    // Group conversations by the other participant's ID
+    for (const conversation of conversations) {
+      if (conversation.groupChat) {
+        continue; // Skip group chats
+      }
+
+      const otherParticipant = this.getOtherParticipant(conversation);
+      if (!otherParticipant) {
+        continue; // Skip if we can't find the other participant
+      }
+
+      const participantId = otherParticipant.id;
+      if (!conversationsByParticipant.has(participantId)) {
+        conversationsByParticipant.set(participantId, []);
+      }
+
+      conversationsByParticipant.get(participantId)?.push(conversation);
+    }
+
+    // Create a new list of grouped conversations
+    const groupedConversations: any[] = [];
+
+    // For each participant, create a single conversation entry with the most recent message
+    conversationsByParticipant.forEach((participantConversations, _) => {
+      if (participantConversations.length === 0) {
+        return;
+      }
+
+      // Sort conversations by updatedAt date (most recent first)
+      participantConversations.sort((a, b) => {
+        const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      // Get the most recent conversation
+      const mostRecentConversation = participantConversations[0];
+      const otherParticipant = this.getOtherParticipant(mostRecentConversation);
+
+      if (!otherParticipant) {
+        return;
+      }
+
+      // Calculate total unread count across all conversations with this participant
+      const totalUnreadCount = participantConversations.reduce(
+        (total, conv) => total + (conv.unreadCount || 0),
+        0
+      );
+
+      // Create a new conversation object that represents all conversations with this participant
+      const groupedConversation = {
+        ...mostRecentConversation,
+        _isGrouped: true,
+        _originalConversations: participantConversations,
+        _otherParticipant: otherParticipant,
+        unreadCount: totalUnreadCount
+      };
+
+      groupedConversations.push(groupedConversation);
+    });
+
+    // Sort grouped conversations by the most recent message
+    groupedConversations.sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return groupedConversations;
   }
 }

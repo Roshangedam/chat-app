@@ -1,8 +1,54 @@
 <div class="message-list-container" #scrollContainer>
   <div class="messages-wrapper">
-    <!-- Loading spinner -->
-    <div class="loading-spinner" *ngIf="loading">
+    <!-- Pull-to-refresh indicator -->
+    <div class="pull-to-refresh"
+         [class.active]="isPulling || (loading && messages.length > 0)"
+         [style.height.px]="pullDistance"
+         [attr.aria-hidden]="!isPulling && !loading"
+         role="progressbar"
+         [attr.aria-label]="isPulling ? 'Pull down to refresh' : 'Loading older messages'"
+         [attr.aria-valuenow]="isPulling ? pullProgress : loadingProgress">
+
+      <!-- Pull indicator (shown while pulling) -->
+      <div class="pull-indicator" *ngIf="isPulling && !loading">
+        <div class="pull-arrow" [class.ready]="pullProgress >= 100">
+          <mat-icon>arrow_downward</mat-icon>
+        </div>
+        <div class="pull-text">
+          {{ pullProgress >= 100 ? 'Release to refresh' : 'Pull down to load more' }}
+        </div>
+        <mat-progress-bar
+          class="pull-progress"
+          mode="determinate"
+          [value]="pullProgress">
+        </mat-progress-bar>
+      </div>
+
+      <!-- Loading indicator (shown while loading) -->
+      <div class="loading-indicator" *ngIf="loading && messages.length > 0">
+        <div class="loading-animation">
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+        <div class="loading-text">Loading older messages</div>
+        <mat-progress-bar
+          class="loading-progress"
+          mode="determinate"
+          [value]="loadingProgress">
+        </mat-progress-bar>
+      </div>
+    </div>
+
+    <!-- Loading spinner for initial load -->
+    <div class="loading-spinner" *ngIf="loading && messages.length === 0">
       <mat-spinner diameter="40"></mat-spinner>
+    </div>
+
+    <!-- Scroll hint when not loading -->
+    <div class="scroll-hint" *ngIf="hasMoreMessages && !loading && !isPulling && messages.length > 0">
+      <mat-icon>keyboard_arrow_up</mat-icon>
+      <span>Scroll up for older messages</span>
     </div>
 
     <!-- No messages placeholder -->
@@ -23,7 +69,8 @@
         <chat-message-item
           [message]="message"
           [isOwnMessage]="isOwnMessage(message)"
-          [showAvatar]="shouldShowAvatar(i, message)">
+          [showAvatar]="shouldShowAvatar(i, message, group.messages)"
+          (retry)="onRetryMessage($event)">
         </chat-message-item>
       </ng-container>
     </ng-container>

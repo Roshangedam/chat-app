@@ -1,10 +1,21 @@
 package com.chat.app.backend.feature.chat.model;
 
-import jakarta.persistence.*;
-
 import java.time.LocalDateTime;
 
 import com.chat.app.backend.feature.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
 
 /**
  * Entity representing a message in the chat application.
@@ -39,6 +50,9 @@ public class Message {
 
     @Enumerated(EnumType.STRING)
     private MessageStatus status = MessageStatus.SENT;
+
+    @Column(name = "retry_count")
+    private Integer retryCount = 0;
 
     // Default constructor
     public Message() {
@@ -120,6 +134,14 @@ public class Message {
 
     public void setStatus(MessageStatus status) {
         this.status = status;
+    }
+
+    public Integer getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(Integer retryCount) {
+        this.retryCount = retryCount;
     }
 
     @PrePersist

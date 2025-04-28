@@ -20,31 +20,40 @@
     <mat-sidenav-content>
       <!-- For Mobile and Portrait Tablet: Full Screen Layout -->
       <div *ngIf="(responsiveUtils.isHandset$ | async) || (responsiveUtils.isPortrait$ | async)" class="mobile-view">
-        <!-- Mobile Header with Menu Button -->
-        <div class="mobile-header">
-          <button mat-icon-button (click)="navDrawer.toggle()" *ngIf="!activeConversation">
-            <mat-icon>menu</mat-icon>
-          </button>
-          <button mat-icon-button (click)="onBackClicked()" *ngIf="activeConversation">
-            <mat-icon>arrow_back</mat-icon>
-          </button>
-          <span class="mobile-title">
-            {{ activeConversation ? getConversationName(activeConversation) : 'Chat App' }}
-          </span>
-          <button mat-icon-button [matMenuTriggerFor]="mobileMenu">
-            <mat-icon>more_vert</mat-icon>
-          </button>
-          <mat-menu #mobileMenu="matMenu">
-            <button mat-menu-item routerLink="/auth/profile">
-              <mat-icon>account_circle</mat-icon>
-              <span>Profile</span>
+        <!-- Mobile Header -->
+        <ng-container *ngIf="!activeConversation">
+          <!-- App Header when no conversation is selected -->
+          <div class="mobile-header">
+            <button mat-icon-button (click)="navDrawer.toggle()">
+              <mat-icon>menu</mat-icon>
             </button>
-            <button mat-menu-item (click)="logout()">
-              <mat-icon>exit_to_app</mat-icon>
-              <span>Logout</span>
+            <span class="mobile-title">Chat App</span>
+            <button mat-icon-button [matMenuTriggerFor]="mobileMenu">
+              <mat-icon>more_vert</mat-icon>
             </button>
-          </mat-menu>
-        </div>
+            <mat-menu #mobileMenu="matMenu">
+              <button mat-menu-item routerLink="/auth/profile">
+                <mat-icon>account_circle</mat-icon>
+                <span>Profile</span>
+              </button>
+              <button mat-menu-item (click)="logout()">
+                <mat-icon>exit_to_app</mat-icon>
+                <span>Logout</span>
+              </button>
+            </mat-menu>
+          </div>
+        </ng-container>
+
+        <!-- Chat Header when conversation is selected -->
+        <chat-header
+          *ngIf="activeConversation"
+          [conversation]="activeConversation"
+          [currentUserId]="currentUser?.id"
+          [isMobileView]="true"
+          [showCallButtons]="true"
+          (backClick)="onBackClicked()"
+          (menuAction)="onMenuAction($event)">
+        </chat-header>
 
         <!-- Mobile Tabs (only show when not in a conversation) -->
         <app-top-tabs
@@ -73,6 +82,7 @@
         <app-main-screen
           *ngIf="activeConversation"
           [conversation]="activeConversation"
+          [userId]="currentUser?.id"
           [showHeader]="false"
           (backClicked)="onBackClicked()">
         </app-main-screen>
@@ -108,14 +118,6 @@
             </div>
           </div>
 
-          <!-- Search bar -->
-          <div class="search-container">
-            <mat-form-field appearance="outline" class="search-field">
-              <mat-icon matPrefix>search</mat-icon>
-              <input matInput placeholder="Search or start new chat" [(ngModel)]="searchQuery">
-            </mat-form-field>
-          </div>
-
           <!-- Show conversation list for chats section -->
           <app-list-view
             *ngIf="activeSection === 'chats'"
@@ -132,34 +134,10 @@
 
         <!-- Main Content Area -->
         <div class="main-content">
-          <!-- Feature Toolbar - Will be used for future features like calls -->
-          <!-- <div class="chat-header" *ngIf="activeConversation">
-            <div class="chat-info">
-              <img [src]="getConversationAvatar(activeConversation)" alt="Chat" class="chat-avatar">
-              <div class="chat-details">
-                <span class="chat-name">{{ getConversationName(activeConversation) }}</span>
-                <span class="chat-status">{{ getConversationStatus(activeConversation) }}</span>
-              </div>
-            </div>
-            <div class="chat-actions">
-              <button mat-icon-button *ngIf="featureFlags.enableCalls" matTooltip="Start Voice Call" (click)="startVoiceCall()">
-                <mat-icon>call</mat-icon>
-              </button>
-              <button mat-icon-button *ngIf="featureFlags.enableVideoChat" matTooltip="Start Video Call" (click)="startVideoCall()">
-                <mat-icon>videocam</mat-icon>
-              </button>
-              <button mat-icon-button *ngIf="featureFlags.enableScreenSharing" matTooltip="Share Screen" (click)="shareScreen()">
-                <mat-icon>screen_share</mat-icon>
-              </button>
-              <button mat-icon-button matTooltip="More Options">
-                <mat-icon>more_vert</mat-icon>
-              </button>
-            </div>
-          </div> -->
-
           <!-- Main Screen (Chat Room) -->
           <app-main-screen style="height: 100%;"
             [conversation]="activeConversation"
+            [userId]="currentUser?.id"
             (backClicked)="onBackClicked()">
           </app-main-screen>
         </div>

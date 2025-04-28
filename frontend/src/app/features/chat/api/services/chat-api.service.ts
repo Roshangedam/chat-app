@@ -34,10 +34,21 @@ export class ChatApiService {
    * Get a specific conversation by ID
    */
   getConversation(conversationId: string | number): Observable<ChatConversation> {
-    return this.http.get<ChatConversation>(`${this.baseUrl}/conversations/${conversationId}`)
+    console.log(`ChatApiService: Getting conversation ${conversationId}`);
+    const url = `${this.baseUrl}/conversations/${conversationId}`;
+    console.log(`ChatApiService: API URL: ${url}`);
+
+    return this.http.get<ChatConversation>(url)
       .pipe(
+        tap(() => {
+          console.log(`ChatApiService: Successfully fetched conversation ${conversationId}`);
+        }),
         catchError(error => {
-          console.error(`Error fetching conversation ${conversationId}:`, error);
+          console.error(`ChatApiService: Error fetching conversation ${conversationId}:`, error);
+          console.error(`ChatApiService: Error status: ${error.status}, message: ${error.message}`);
+          if (error.error) {
+            console.error(`ChatApiService: Error details:`, error.error);
+          }
           return throwError(() => error);
         })
       );
@@ -78,22 +89,31 @@ export class ChatApiService {
 
   /**
    * Get message history for a conversation
+   * Retrieves messages in chronological order (oldest first)
    */
   getMessageHistory(
     conversationId: string | number,
     page: number = 0,
     size: number = 20
   ): Observable<ChatMessage[]> {
-    console.log(`Fetching messages for conversation ${conversationId}, page ${page}, size ${size}`);
+    console.log(`ChatApiService: Fetching messages for conversation ${conversationId}, page ${page}, size ${size}`);
 
-    return this.http.get<ChatMessage[]>(
-      `${this.baseUrl}/messages/conversation/${conversationId}?page=${page}&size=${size}`
-    ).pipe(
+    // Add sort parameter to ensure consistent ordering from the API
+    // sort=sentAt,asc ensures oldest messages come first
+    const url = `${this.baseUrl}/messages/conversation/${conversationId}?page=${page}&size=${size}&sort=sentAt,asc`;
+    console.log(`ChatApiService: API URL: ${url}`);
+
+    return this.http.get<ChatMessage[]>(url).pipe(
       tap(messages => {
-        console.log(`Received ${messages?.length || 0} messages for conversation ${conversationId}:`, messages);
+        console.log(`ChatApiService: Received ${messages?.length || 0} messages for conversation ${conversationId}`);
+        if (messages?.length > 0) {
+          // Log first and last message content
+          console.log(`ChatApiService: First message: ${messages[0].content.substring(0, 20)}...`);
+          console.log(`ChatApiService: Last message: ${messages[messages.length-1].content.substring(0, 20)}...`);
+        }
       }),
       catchError(error => {
-        console.error(`Error fetching messages for conversation ${conversationId}:`, error);
+        console.error(`ChatApiService: Error fetching messages for conversation ${conversationId}:`, error);
         return throwError(() => error);
       })
     );
@@ -183,6 +203,22 @@ export class ChatApiService {
     ).pipe(
       catchError(error => {
         console.error('Error updating conversation:', error);
+        return throwError(() => error);
+      })
+    );
+  }
+
+  /**
+   * Retry sending a failed message
+   * @param messageId ID of the message to retry
+   */
+  retryMessage(messageId: string | number): Observable<any> {
+    return this.http.post<any>(
+      `${this.baseUrl}/messages/${messageId}/retry`,
+      {}
+    ).pipe(
+      catchError(error => {
+        console.error('Error retrying message:', error);
         return throwError(() => error);
       })
     );

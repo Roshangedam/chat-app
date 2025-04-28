@@ -2,10 +2,9 @@ package com.chat.app.backend.feature.user.controller;
 
 
 
-import com.chat.app.backend.feature.user.dto.UserStatusDTO;
-import com.chat.app.backend.feature.user.model.User;
-import com.chat.app.backend.feature.user.repository.UserRepository;
-import com.chat.app.backend.feature.auth.security.UserDetailsImpl;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,8 +14,11 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
-import java.time.LocalDateTime;
-import java.util.Optional;
+import com.chat.app.backend.feature.auth.security.UserDetailsImpl;
+import com.chat.app.backend.feature.chat.service.MessageSyncService;
+import com.chat.app.backend.feature.user.dto.UserStatusDTO;
+import com.chat.app.backend.feature.user.model.User;
+import com.chat.app.backend.feature.user.repository.UserRepository;
 
 /**
  * Controller for handling user status WebSocket messages.
@@ -31,6 +33,9 @@ public class UserStatusController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private MessageSyncService messageSyncService;
 
     /**
      * Handle user status update messages.
@@ -66,7 +71,13 @@ public class UserStatusController {
 
                 // Broadcast to all users
                 messagingTemplate.convertAndSend("/topic/user.status", broadcastStatus);
-                
+
+                // If user is coming online, process pending messages
+                if ("ONLINE".equals(statusDTO.getStatus().toString())) {
+                    logger.info("User {} is now online, processing pending messages", user.getUsername());
+                    messageSyncService.processPendingMessagesForUser(userId);
+                }
+
                 logger.info("User status updated: {} -> {}", user.getUsername(), statusDTO.getStatus());
             } else {
                 logger.warn("User not found for ID: {}", userId);

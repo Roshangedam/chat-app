@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angu
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ChatService } from '../../api/services/chat.service';
 import { ChatMessage, ChatConversation } from '../../api/models';
 import { ChatHeaderComponent } from '../conversation/chat-header/chat-header.component';
@@ -17,6 +18,7 @@ import { ChatMessageInputComponent } from '../message/chat-message-input/chat-me
   standalone: true,
   imports: [
     CommonModule,
+    MatSnackBarModule,
     ChatHeaderComponent,
     ChatMessageListComponent,
     ChatMessageInputComponent
@@ -41,9 +43,14 @@ export class ChatContainerComponent implements OnInit, OnDestroy {
   typingUser = '';
   typingTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  // Pagination properties
+  currentPage = 0;
+  pageSize = 20;
+  hasMoreMessages = true; // Assume there are more messages initially
+
   private subscriptions = new Subscription();
 
-  constructor(private chatService: ChatService) {}
+  constructor(private chatService: ChatService, private snackBar: MatSnackBar) {}
 
   ngOnInit(): void {
     // Subscribe to messages
@@ -87,11 +94,15 @@ export class ChatContainerComponent implements OnInit, OnDestroy {
    * @param conversationId ID of the conversation to load
    */
   loadConversation(conversationId: string | number): void {
+    // Reset pagination when loading a new conversation
+    this.currentPage = 0;
+    this.hasMoreMessages = true;
+
     this.chatService.getConversation(conversationId).subscribe({
       next: (conversation) => {
         this.conversation = conversation;
         this.chatService.setActiveConversation(conversation);
-        this.chatService.loadMessages().subscribe();
+        this.loadMessages(this.currentPage);
         this.conversationChanged.emit(conversation);
       },
       error: (error) => {
@@ -142,6 +153,60 @@ export class ChatContainerComponent implements OnInit, OnDestroy {
    */
   onBackClick(): void {
     this.backClicked.emit();
+  }
+
+  /**
+   * Load messages for the current conversation with pagination
+   * @param page Page number to load (0-based)
+   */
+  loadMessages(page: number): void {
+    if (!this.conversation) return;
+
+    this.chatService.loadMessages(page, this.pageSize).subscribe({
+      next: (messages) => {
+        console.log(`Loaded ${messages.length} messages for page ${page}`);
+
+        // If we received fewer messages than the page size, we've reached the end
+        if (messages.length < this.pageSize) {
+          this.hasMoreMessages = false;
+        }
+      },
+      error: (error) => {
+        console.error('Error loading messages:', error);
+      }
+    });
+  }
+
+  /**
+   * Load older messages when the user scrolls to the top
+   */
+  onLoadOlderMessages(): void {
+    if (this.isLoading || !this.hasMoreMessages) return;
+
+    // Increment page number and load the next page of messages
+    this.currentPage++;
+    console.log(`Loading older messages, page ${this.currentPage}`);
+    this.loadMessages(this.currentPage);
+  }
+
+  /**
+   * Retry sending a failed message
+   * @param messageId ID of the message to retry
+   */
+  onRetryMessage(messageId: string | number): void {
+    this.chatService.retryMessage(messageId).subscribe({
+      next: () => {
+        this.snackBar.open('Message queued for retry', 'Dismiss', {
+          duration: 3000
+        });
+      },
+      error: (error) => {
+        console.error('Error retrying message:', error);
+        this.snackBar.open('Failed to retry message', 'Dismiss', {
+          duration: 3000
+        });
+      }
+    });
   }
 
   /**

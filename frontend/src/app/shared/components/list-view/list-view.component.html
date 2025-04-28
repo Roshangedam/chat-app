@@ -38,7 +38,7 @@
           <img [src]="getAvatarUrl(conversation)" alt="Avatar" class="avatar">
           <ng-container *ngIf="!conversation.groupChat">
             <ng-container *ngIf="getOtherParticipant(conversation) as otherParticipant">
-              <app-status-indicator [userId]="otherParticipant.id"></app-status-indicator>
+              <app-status-indicator [userId]="otherParticipant.id" class="status-bottom-right"></app-status-indicator>
             </ng-container>
           </ng-container>
         </div>
@@ -48,7 +48,7 @@
         </div>
 
         <div matListItemLine class="conversation-preview">
-          {{ conversation.lastMessage || 'No messages yet' }}
+          {{ getLastMessagePreview(conversation) || 'No messages yet'  }}
         </div>
 
         <div matListItemMeta class="conversation-meta">
@@ -62,27 +62,33 @@
 
     <!-- Contacts List -->
     <mat-nav-list *ngIf="activeSection === 'contacts' || activeSection === 'people'">
-      <a mat-list-item
-         *ngFor="let contact of getFilteredItems()"
-         (click)="onContactClick(contact)"
-         class="contact-item">
-        <div matListItemAvatar class="avatar-container">
-          <img [src]="getAvatarUrl(contact)" alt="Avatar" class="avatar">
-          <app-status-indicator [userId]="contact.id"></app-status-indicator>
-        </div>
+      <ng-container *ngFor="let contact of getFilteredItems(); trackBy: trackById">
+        <a mat-list-item
+           (click)="onContactClick(contact)"
+           class="contact-item">
+          <div matListItemAvatar class="avatar-container">
+            <app-user-avatar
+              [userId]="contact.id"
+              [avatarUrl]="getAvatarUrl(contact)"
+              [altText]="contact.username + '\'s avatar'"
+              [clickable]="true">
+            </app-user-avatar>
+          </div>
 
-        <div matListItemTitle class="contact-name">
-          {{ contact.fullName || contact.username }}
-        </div>
+          <div matListItemTitle class="contact-name">
+            {{ contact.fullName || contact.username }}
+          </div>
 
-        <div matListItemLine class="contact-info" *ngIf="contact.bio">
-          {{ contact.bio }}
-        </div>
+          <div matListItemLine class="contact-username">
+            {{ '@' + contact.username }}
+          </div>
 
-        <div matListItemMeta class="contact-meta">
-          <span class="status-text">{{ getUserStatus(contact) | titlecase }}</span>
-        </div>
-      </a>
+          <div matListItemMeta class="contact-meta">
+            <span class="status-text">{{ getUserStatus(contact) | titlecase }}</span>
+          </div>
+        </a>
+        <mat-divider></mat-divider>
+      </ng-container>
     </mat-nav-list>
   </div>
 </div>

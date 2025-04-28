@@ -15,14 +15,12 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
 
 // Component Imports
-import { ChatComponent } from './components/chat/chat.component';
-import { MessageListComponent } from './components/message-list/message-list.component';
-import { MessageInputComponent } from './components/message-input/message-input.component';
 import { ChatContainerComponent } from './components/chat-container/chat-container.component';
 import { ChatHeaderComponent } from './components/conversation/chat-header/chat-header.component';
 import { ChatMessageListComponent } from './components/message/chat-message-list/chat-message-list.component';
 import { ChatMessageItemComponent } from './components/message/chat-message-item/chat-message-item.component';
 import { ChatMessageInputComponent } from './components/message/chat-message-input/chat-message-input.component';
+import { ConversationListComponent } from './components/conversation-list/conversation-list.component';
 
 // Service Imports
 import { ChatService } from './api/services/chat.service';
@@ -58,9 +56,7 @@ export interface ChatModuleConfig {
     ChatMessageListComponent,
     ChatMessageItemComponent,
     ChatMessageInputComponent,
-    ChatComponent,
-    MessageListComponent,
-    MessageInputComponent
+    ConversationListComponent,
   ],
   exports: [
     // All components
@@ -69,9 +65,7 @@ export interface ChatModuleConfig {
     ChatMessageListComponent,
     ChatMessageItemComponent,
     ChatMessageInputComponent,
-    ChatComponent,
-    MessageListComponent,
-    MessageInputComponent
+    ConversationListComponent
   ],
   providers: [
     // Services

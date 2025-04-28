@@ -79,6 +79,11 @@ app:
     expiration-ms: 86400000 # 24 hours
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  chat:
+    message:
+      max-retry-count: ${MESSAGE_MAX_RETRY_COUNT:3}
+      retry-interval-seconds: ${MESSAGE_RETRY_INTERVAL_SECONDS:30}
+      retry-interval-ms: ${MESSAGE_RETRY_INTERVAL_MS:30000}
 
 # Profile-specific configurations
 ---
@@ -92,9 +97,7 @@ spring:
     password: rootpassword
   kafka:
     bootstrap-servers: kafka:9092
-
-
-security:
+  security:
     oauth2:
       client:
         registration:

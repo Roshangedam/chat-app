@@ -11,10 +11,23 @@
 
   <!-- Chat Room (when conversation is selected) -->
   <div *ngIf="conversation" class="chat-room-container">
+    <!-- Custom header when showHeader is true -->
+    <chat-header
+      *ngIf="showHeader"
+      [conversation]="conversation"
+      [currentUserId]="userId || null"
+      [isTyping]="isTyping"
+      [typingUser]="typingUser"
+      [isMobileView]="(responsiveUtils.isHandset$ | async) === true"
+      (backClick)="onBackClicked()"
+      (menuAction)="onMenuAction($event)">
+    </chat-header>
+
+    <!-- Chat container with header hidden since we're using our own -->
     <chat-container
       [conversationId]="conversation.id"
       [userId]="userId"
-      [showHeader]="showHeader"
+      [showHeader]="false"
       (messageSent)="onMessageSent($event)"
       (conversationChanged)="onConversationChanged($event)"
       (backClicked)="onBackClicked()">

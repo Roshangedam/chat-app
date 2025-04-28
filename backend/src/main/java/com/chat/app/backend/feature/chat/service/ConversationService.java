@@ -1,20 +1,26 @@
 package com.chat.app.backend.feature.chat.service;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.chat.app.backend.feature.chat.dto.ConversationDTO;
+import com.chat.app.backend.feature.chat.dto.MessageDTO;
 import com.chat.app.backend.feature.user.dto.UserDTO;
 import com.chat.app.backend.feature.chat.model.Conversation;
+import com.chat.app.backend.feature.chat.model.Message;
+import com.chat.app.backend.feature.chat.model.MessageStatus;
 import com.chat.app.backend.feature.user.model.User;
 import com.chat.app.backend.feature.chat.repository.ConversationRepository;
+import com.chat.app.backend.feature.chat.repository.MessageRepository;
 import com.chat.app.backend.feature.user.repository.UserRepository;
 
 /**
@@ -29,8 +35,12 @@ public class ConversationService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private MessageRepository messageRepository;
+
     /**
      * Get all conversations for a user.
+     * For one-to-one conversations, only the most recent conversation with each participant is returned.
      *
      * @param userId the user ID
      * @return list of conversation DTOs
@@ -40,11 +50,78 @@ public class ConversationService {
         if (userOpt.isEmpty()) {
             throw new RuntimeException("User not found");
         }
+        User currentUser = userOpt.get();
 
-        List<Conversation> conversations = conversationRepository.findByParticipant(userOpt.get());
-        return conversations.stream()
-                .map(this::convertToDTO)
+        // Get all conversations the user is part of
+        List<Conversation> allConversations = conversationRepository.findByParticipant(currentUser);
+
+        // Separate group chats and one-to-one chats
+        List<Conversation> groupChats = allConversations.stream()
+                .filter(Conversation::isGroupChat)
                 .collect(Collectors.toList());
+
+        List<Conversation> oneToOneChats = allConversations.stream()
+                .filter(c -> !c.isGroupChat())
+                .collect(Collectors.toList());
+
+        // Group one-to-one conversations by the other participant
+        Map<Long, List<Conversation>> conversationsByParticipant = new HashMap<>();
+
+        for (Conversation conversation : oneToOneChats) {
+            // Find the other participant
+            User otherParticipant = conversation.getParticipants().stream()
+                    .filter(p -> !p.getId().equals(userId))
+                    .findFirst()
+                    .orElse(null);
+
+            if (otherParticipant != null) {
+                Long participantId = otherParticipant.getId();
+                if (!conversationsByParticipant.containsKey(participantId)) {
+                    conversationsByParticipant.put(participantId, new ArrayList<>());
+                }
+                conversationsByParticipant.get(participantId).add(conversation);
+            }
+        }
+
+        // For each participant, keep only the most recent conversation
+        List<Conversation> consolidatedOneToOneChats = new ArrayList<>();
+
+        for (List<Conversation> participantConversations : conversationsByParticipant.values()) {
+            // Sort by updatedAt (most recent first)
+            participantConversations.sort((a, b) -> {
+                LocalDateTime timeA = a.getUpdatedAt() != null ? a.getUpdatedAt() : a.getCreatedAt();
+                LocalDateTime timeB = b.getUpdatedAt() != null ? b.getUpdatedAt() : b.getCreatedAt();
+                return timeB.compareTo(timeA);
+            });
+
+            // Add only the most recent conversation
+            if (!participantConversations.isEmpty()) {
+                consolidatedOneToOneChats.add(participantConversations.get(0));
+            }
+        }
+
+        // Combine group chats and consolidated one-to-one chats
+        List<Conversation> consolidatedConversations = new ArrayList<>();
+        consolidatedConversations.addAll(groupChats);
+        consolidatedConversations.addAll(consolidatedOneToOneChats);
+
+        // Sort all conversations by updatedAt (most recent first)
+        consolidatedConversations.sort((a, b) -> {
+            LocalDateTime timeA = a.getUpdatedAt() != null ? a.getUpdatedAt() : a.getCreatedAt();
+            LocalDateTime timeB = b.getUpdatedAt() != null ? b.getUpdatedAt() : b.getCreatedAt();
+            return timeB.compareTo(timeA);
+        });
+
+        // Convert to DTOs and populate with latest messages
+        List<ConversationDTO> conversationDTOs = consolidatedConversations.stream()
+                .map(conversation -> {
+                    ConversationDTO dto = convertToDTO(conversation);
+                    populateLatestMessage(dto, conversation);
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        return conversationDTOs;
     }
 
     /**
@@ -59,7 +136,10 @@ public class ConversationService {
             throw new RuntimeException("Conversation not found");
         }
 
-        return convertToDTO(conversationOpt.get());
+        Conversation conversation = conversationOpt.get();
+        ConversationDTO dto = convertToDTO(conversation);
+        populateLatestMessage(dto, conversation);
+        return dto;
     }
 
     /**
@@ -86,7 +166,9 @@ public class ConversationService {
             throw new RuntimeException("User does not have access to this conversation");
         }
 
-        return convertToDTO(conversation);
+        ConversationDTO dto = convertToDTO(conversation);
+        populateLatestMessage(dto, conversation);
+        return dto;
     }
 
     /**
@@ -115,14 +197,18 @@ public class ConversationService {
         // Check if conversation already exists
         Optional<Conversation> existingConversation = conversationRepository.findOneToOneConversation(creator, participant);
         if (existingConversation.isPresent()) {
-            return convertToDTO(existingConversation.get());
+            ConversationDTO dto = convertToDTO(existingConversation.get());
+            populateLatestMessage(dto, existingConversation.get());
+            return dto;
         }
 
         // Create new conversation
         Conversation conversation = new Conversation(creator, participant);
         Conversation savedConversation = conversationRepository.save(conversation);
 
-        return convertToDTO(savedConversation);
+        ConversationDTO dto = convertToDTO(savedConversation);
+        populateLatestMessage(dto, savedConversation);
+        return dto;
     }
 
     /**
@@ -158,7 +244,9 @@ public class ConversationService {
 
         Conversation savedConversation = conversationRepository.save(conversation);
 
-        return convertToDTO(savedConversation);
+        ConversationDTO dto = convertToDTO(savedConversation);
+        populateLatestMessage(dto, savedConversation);
+        return dto;
     }
 
     /**
@@ -193,7 +281,9 @@ public class ConversationService {
 
         Conversation savedConversation = conversationRepository.save(conversation);
 
-        return convertToDTO(savedConversation);
+        ConversationDTO dto = convertToDTO(savedConversation);
+        populateLatestMessage(dto, savedConversation);
+        return dto;
     }
 
     /**
@@ -232,7 +322,9 @@ public class ConversationService {
 
         Conversation savedConversation = conversationRepository.save(conversation);
 
-        return convertToDTO(savedConversation);
+        ConversationDTO dto = convertToDTO(savedConversation);
+        populateLatestMessage(dto, savedConversation);
+        return dto;
     }
 
     /**
@@ -269,7 +361,9 @@ public class ConversationService {
 
         Conversation savedConversation = conversationRepository.save(conversation);
 
-        return convertToDTO(savedConversation);
+        ConversationDTO dto = convertToDTO(savedConversation);
+        populateLatestMessage(dto, savedConversation);
+        return dto;
     }
 
     /**
@@ -300,6 +394,34 @@ public class ConversationService {
         dto.setParticipants(participantDTOs);
 
         return dto;
+    }
+
+    /**
+     * Populate the latest message for a conversation DTO.
+     *
+     * @param dto the conversation DTO to populate
+     * @param conversation the conversation entity
+     */
+    private void populateLatestMessage(ConversationDTO dto, Conversation conversation) {
+        // Use a pageable to get the most recent message
+        Pageable pageable = PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "sentAt"));
+        Page<Message> latestMessagePage = messageRepository.findByConversationOrderBySentAtDesc(conversation, pageable);
+
+        if (latestMessagePage.hasContent()) {
+            Message latestMessage = latestMessagePage.getContent().get(0);
+            MessageDTO messageDTO = new MessageDTO();
+            messageDTO.setId(latestMessage.getId());
+            messageDTO.setContent(latestMessage.getContent());
+            messageDTO.setSentAt(latestMessage.getSentAt());
+            messageDTO.setStatus(latestMessage.getStatus());
+
+            if (latestMessage.getSender() != null) {
+                messageDTO.setSenderId(latestMessage.getSender().getId());
+                messageDTO.setSenderUsername(latestMessage.getSender().getUsername());
+            }
+
+            dto.setLastMessage(messageDTO);
+        }
     }
 
     /**
@@ -421,7 +543,9 @@ public class ConversationService {
 
         Conversation savedConversation = conversationRepository.save(conversation);
 
-        return convertToDTO(savedConversation);
+        ConversationDTO dto = convertToDTO(savedConversation);
+        populateLatestMessage(dto, savedConversation);
+        return dto;
     }
 
     /**
@@ -450,7 +574,11 @@ public class ConversationService {
         // Filter to only include conversations the user is a participant in
         return matchingConversations.stream()
                 .filter(conversation -> conversation.getParticipants().contains(user))
-                .map(this::convertToDTO)
+                .map(conversation -> {
+                    ConversationDTO dto = convertToDTO(conversation);
+                    populateLatestMessage(dto, conversation);
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 }

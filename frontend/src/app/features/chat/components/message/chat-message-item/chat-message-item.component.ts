@@ -1,6 +1,8 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ChatMessage } from '../../../api/models';
 
 /**
@@ -12,7 +14,9 @@ import { ChatMessage } from '../../../api/models';
   standalone: true,
   imports: [
     CommonModule,
-    MatIconModule
+    MatIconModule,
+    MatButtonModule,
+    MatTooltipModule
   ],
   templateUrl: './chat-message-item.component.html',
   styleUrls: ['./chat-message-item.component.css']
@@ -21,6 +25,7 @@ export class ChatMessageItemComponent {
   @Input() message!: ChatMessage;
   @Input() isOwnMessage = false;
   @Input() showAvatar = true;
+  @Output() retry = new EventEmitter<string | number>();
 
   /**
    * Get the message date
@@ -41,5 +46,18 @@ export class ChatMessageItemComponent {
    */
   getSenderName(): string {
     return this.message.senderUsername || 'User';
+  }
+
+  /**
+   * Retry sending a failed message
+   * @param event The click event
+   */
+  retryMessage(event: Event): void {
+    // Stop event propagation to prevent parent elements from handling the click
+    event.stopPropagation();
+
+    if (this.message.id) {
+      this.retry.emit(this.message.id);
+    }
   }
 }

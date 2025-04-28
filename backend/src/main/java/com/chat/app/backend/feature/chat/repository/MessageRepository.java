@@ -1,8 +1,8 @@
 package com.chat.app.backend.feature.chat.repository;
 
-import com.chat.app.backend.feature.chat.model.Conversation;
-import com.chat.app.backend.feature.chat.model.Message;
-import com.chat.app.backend.feature.user.model.User;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,8 +10,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import com.chat.app.backend.feature.chat.model.Conversation;
+import com.chat.app.backend.feature.chat.model.Message;
+import com.chat.app.backend.feature.chat.model.MessageStatus;
+import com.chat.app.backend.feature.user.model.User;
 
 /**
  * Repository interface for Message entity operations.
@@ -87,4 +89,70 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
            "(SELECT MAX(m2.id) FROM Message m2 WHERE m2.conversation IN " +
            "(SELECT c FROM Conversation c JOIN c.participants p WHERE p.id = :userId))")
     List<Message> findLatestMessagesForUser(@Param("userId") Long userId);
+
+    /**
+     * Find pending messages (sent but not delivered) for a user in a conversation.
+     * These are messages that were sent while the user was offline.
+     *
+     * @param conversation the conversation to check
+     * @param user the user to find pending messages for
+     * @return a list of pending messages
+     */
+    @Query("SELECT m FROM Message m WHERE m.conversation = :conversation " +
+           "AND m.sender != :user AND m.status = 'SENT' AND m.deliveredAt IS NULL")
+    List<Message> findPendingMessagesForUser(@Param("conversation") Conversation conversation, @Param("user") User user);
+
+    /**
+     * Find messages by status.
+     *
+     * @param status the status to find messages for
+     * @return a list of messages with the specified status
+     */
+    List<Message> findByStatus(MessageStatus status);
+
+    /**
+     * Find messages by status with a limit on retry count.
+     *
+     * @param status the status to find messages for
+     * @param maxRetryCount the maximum retry count
+     * @return a list of messages with the specified status and retry count less than or equal to maxRetryCount
+     */
+    @Query("SELECT m FROM Message m WHERE m.status = :status AND m.retryCount <= :maxRetryCount")
+    List<Message> findByStatusAndRetryCountLessThanEqual(@Param("status") MessageStatus status, @Param("maxRetryCount") Integer maxRetryCount);
+
+    /**
+     * Find messages sent to a specific user with a specific status.
+     *
+     * @param user the recipient user
+     * @param status the message status
+     * @return a list of messages sent to the user with the specified status
+     */
+    @Query("SELECT m FROM Message m JOIN m.conversation c JOIN c.participants p " +
+           "WHERE p.id = :#{#user.id} AND m.sender.id != :#{#user.id} AND m.status = :status")
+    List<Message> findBySentToUserAndStatus(@Param("user") User user, @Param("status") MessageStatus status);
+
+    /**
+     * Find messages in a conversation with a specific status and not from a specific sender.
+     *
+     * @param conversation the conversation
+     * @param status the message status
+     * @param sender the sender to exclude
+     * @return a list of messages in the conversation with the specified status and not from the specified sender
+     */
+    @Query("SELECT m FROM Message m WHERE m.conversation = :conversation AND m.status = :status AND m.sender != :sender")
+    List<Message> findByConversationAndStatusAndSenderNot(
+            @Param("conversation") Conversation conversation,
+            @Param("status") MessageStatus status,
+            @Param("sender") User sender);
+
+    /**
+     * Find messages in conversations where a user is a participant and sent after a specific time.
+     *
+     * @param user the participant user
+     * @param since the time after which messages were sent
+     * @return a list of messages in the user's conversations sent after the specified time
+     */
+    @Query("SELECT m FROM Message m JOIN m.conversation c JOIN c.participants p " +
+           "WHERE p.id = :#{#user.id} AND m.sentAt > :since ORDER BY m.sentAt ASC")
+    List<Message> findByConversationParticipantAndSentAtAfter(@Param("user") User user, @Param("since") LocalDateTime since);
 }

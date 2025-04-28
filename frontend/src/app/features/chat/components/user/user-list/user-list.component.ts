@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, OnDestroy, Output, EventEmitter, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatListModule } from '@angular/material/list';
@@ -10,10 +10,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { UserService } from '../../../api/services/user.service';
 import { ChatService } from '../../../api/services/chat.service';
-import { UserStatusService } from '../../../api/services/user-status.service';
 import { ChatUser } from '../../../api/models';
 import { Subscription } from 'rxjs';
-import { StatusIndicatorComponent } from '../../../../../shared/components/status-indicator/status-indicator.component';
+// StatusIndicatorComponent is now used indirectly through UserAvatarComponent
+import { UserAvatarComponent } from '../../../../../shared/components/user-avatar/user-avatar.component';
+import { AvatarService } from '../../../../../shared/services/avatar.service';
+import { StatusService } from '../../../../../shared/services/status.service';
 
 /**
  * Component for displaying a list of users.
@@ -32,10 +34,11 @@ import { StatusIndicatorComponent } from '../../../../../shared/components/statu
     MatProgressSpinnerModule,
     MatButtonModule,
     MatDividerModule,
-    StatusIndicatorComponent
+    UserAvatarComponent
   ],
   templateUrl: './user-list.component.html',
-  styleUrls: ['./user-list.component.css']
+  styleUrls: ['./user-list.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UserListComponent implements OnInit, OnDestroy {
   @Output() startChat = new EventEmitter<ChatUser>();
@@ -51,7 +54,9 @@ export class UserListComponent implements OnInit, OnDestroy {
   constructor(
     private userService: UserService,
     private chatService: ChatService,
-    private userStatusService: UserStatusService
+    private statusService: StatusService,
+    private avatarService: AvatarService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -61,6 +66,7 @@ export class UserListComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.userService.loading$.subscribe(loading => {
         this.isLoading = loading;
+        this.cdr.markForCheck();
       })
     );
 
@@ -69,11 +75,12 @@ export class UserListComponent implements OnInit, OnDestroy {
       this.userService.users$.subscribe(users => {
         this.users = users;
         this.applyFilter();
+
+        // Preload avatars for all users
+        this.avatarService.preloadAvatars(users);
+        this.cdr.markForCheck();
       })
     );
-
-    // Subscribe to user status updates
-    this.userStatusService.subscribeToUserStatus();
   }
 
   ngOnDestroy(): void {
@@ -114,20 +121,31 @@ export class UserListComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Apply filter to users
-   */
-  applyFilter(): void {
-    if (!this.searchQuery.trim()) {
-      this.filteredUsers = [...this.users];
-      return;
-    }
 
-    const query = this.searchQuery.toLowerCase();
-    this.filteredUsers = this.users.filter(user =>
-      user.username.toLowerCase().includes(query) ||
-      (user.fullName && user.fullName.toLowerCase().includes(query))
-    );
+  /**
+   * Apply filter to users based on search query with debounce
+   * This improves performance by not filtering on every keystroke
+   */
+  private debounceTimer: any;
+  onSearchInput(): void {
+    clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => {
+      this.applyFilter();
+    }, 300); // 300ms debounce
+  }
+
+  /**
+   * Apply filter to users based on search query
+   */
+  private applyFilter(): void {
+    const query = this.searchQuery.toLowerCase().trim();
+    this.filteredUsers = !query
+      ? [...this.users]
+      : this.users.filter(user =>
+          user.username.toLowerCase().includes(query) ||
+          (user.fullName && user.fullName.toLowerCase().includes(query))
+        );
+    this.cdr.markForCheck();
   }
 
   /**
@@ -165,8 +183,8 @@ export class UserListComponent implements OnInit, OnDestroy {
     // If input is a user object
     if (userOrStatus && typeof userOrStatus !== 'string') {
       const user = userOrStatus as ChatUser;
-      // First check if we have a real-time status from the UserStatusService
-      const realTimeStatus = this.userStatusService.getUserStatus(user.id);
+      // First check if we have a real-time status from the StatusService
+      const realTimeStatus = this.statusService.getUserStatus(user.id);
       if (realTimeStatus) {
         return realTimeStatus.toLowerCase();
       }
@@ -178,5 +196,14 @@ export class UserListComponent implements OnInit, OnDestroy {
     const status = userOrStatus as string;
     if (!status) return 'offline';
     return status.toLowerCase();
+  }
+
+  /**
+   * Track users by ID for ngFor optimization
+   * @param _ Index of the item (not used)
+   * @param user User object
+   */
+  trackByUserId(_: number, user: ChatUser): string | number {
+    return user.id;
   }
 }
