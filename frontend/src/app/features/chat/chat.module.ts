@@ -15,11 +15,11 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
 
 // Component Imports
-import { ChatContainerComponent } from './components/chat-container/chat-container.component';
+import { ChatContainerComponent } from './components/conversation/chat-container/chat-container.component';
 import { ChatHeaderComponent } from './components/conversation/chat-header/chat-header.component';
-import { ChatMessageListComponent } from './components/message/chat-message-list/chat-message-list.component';
-import { ChatMessageItemComponent } from './components/message/chat-message-item/chat-message-item.component';
-import { ChatMessageInputComponent } from './components/message/chat-message-input/chat-message-input.component';
+import { ChatMessageListComponent } from './components/conversation/chat-message-list/chat-message-list.component';
+import { ChatMessageItemComponent } from './components/conversation/chat-message-item/chat-message-item.component';
+import { ChatMessageInputComponent } from './components/conversation/chat-message-input/chat-message-input.component';
 import { ConversationListComponent } from './components/conversation-list/conversation-list.component';
 
 // Service Imports

@@ -14,7 +14,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 
 // Import the user list component
-import { UserListComponent } from '../../../features/chat/components/user/user-list/user-list.component';
+import { UserListComponent } from '../../../features/chat/components/user-list/user-list.component';
 import { UserService } from '../../../features/chat/api/services/user.service';
 import { Subscription } from 'rxjs';
 
@@ -29,7 +29,7 @@ import { AuthService } from '../../../core/auth/services/auth.service';
 // Import the chat service and models
 import { ChatService } from '../../../features/chat/api/services/chat.service';
 import { ChatConversation, ChatUser } from '../../../features/chat/api/models';
-import { Section } from '../../../features/chat/models/section.model';
+import { Section } from '../../models/section.model';
 
 @Component({
   selector: 'app-dashboard',

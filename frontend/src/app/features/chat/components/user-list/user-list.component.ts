@@ -8,14 +8,14 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
-import { UserService } from '../../../api/services/user.service';
-import { ChatService } from '../../../api/services/chat.service';
-import { ChatUser } from '../../../api/models';
+import { UserService } from '../../api/services/user.service';
+import { ChatService } from '../../api/services/chat.service';
+import { ChatUser } from '../../api/models';
 import { Subscription } from 'rxjs';
 // StatusIndicatorComponent is now used indirectly through UserAvatarComponent
-import { UserAvatarComponent } from '../../../../../shared/components/user-avatar/user-avatar.component';
-import { AvatarService } from '../../../../../shared/services/avatar.service';
-import { StatusService } from '../../../../../shared/services/status.service';
+import { UserAvatarComponent } from '../../../../shared/components/user-avatar/user-avatar.component';
+import { AvatarService } from '../../../../shared/services/avatar.service';
+import { StatusService } from '../../../../shared/services/status.service';
 
 /**
  * Component for displaying a list of users.

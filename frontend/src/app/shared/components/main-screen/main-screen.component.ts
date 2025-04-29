@@ -6,7 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { Subscription } from 'rxjs';
 
-import { ChatContainerComponent } from '../../../features/chat/components/chat-container/chat-container.component';
+import { ChatContainerComponent } from '../../../features/chat/components/conversation/chat-container/chat-container.component';
 import { ChatHeaderComponent } from '../../../features/chat/components/conversation/chat-header/chat-header.component';
 import { ChatMessage, ChatConversation } from '../../../features/chat/api/models';
 import { ChatService } from '../../../features/chat/api/services/chat.service';

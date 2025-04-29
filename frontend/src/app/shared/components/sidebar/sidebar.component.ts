@@ -8,7 +8,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
-import { Section } from '../../../features/chat/models/section.model';
+import { Section } from '../../models/section.model';
 import { AuthService } from '../../../core/auth/services/auth.service';
 import { User } from '../../../core/auth/services/auth.service';
 import { UserStatusService } from '../../../features/chat/api/services/user-status.service';

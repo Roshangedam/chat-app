@@ -3,11 +3,11 @@ import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { ChatService } from '../../api/services/chat.service';
-import { ChatMessage, ChatConversation, MessageStatusUpdate } from '../../api/models';
-import { ChatHeaderComponent } from '../conversation/chat-header/chat-header.component';
-import { ChatMessageListComponent } from '../message/chat-message-list/chat-message-list.component';
-import { ChatMessageInputComponent } from '../message/chat-message-input/chat-message-input.component';
+import { ChatService } from '../../../api/services/chat.service';
+import { ChatMessage, ChatConversation, MessageStatusUpdate } from '../../../api/models';
+import { ChatHeaderComponent } from '../chat-header/chat-header.component';
+import { ChatMessageListComponent } from '../chat-message-list/chat-message-list.component';
+import { ChatMessageInputComponent } from '../chat-message-input/chat-message-input.component';
 
 /**
  * Main container component for the chat feature.
