@@ -1,22 +1,30 @@
 .message-input-container {
-  background-color: #fff;
-  border-top: 1px solid #e0e0e0;
-  padding: 12px;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 12px 16px;
   z-index: 10;
   position: sticky;
   bottom: 0;
   left: 0;
   right: 0;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
 }
 
 .message-form {
   display: flex;
   align-items: center;
+  width: 100%;
+  justify-content: space-between;
 }
 
 .message-field {
   flex: 1;
   margin-right: 8px;
+  min-width: 0; /* This prevents the field from overflowing its container */
 }
 
 ::ng-deep .message-field .mat-mdc-form-field-subscript-wrapper {
@@ -24,23 +32,47 @@
 }
 
 ::ng-deep .message-field .mat-mdc-text-field-wrapper {
-  background-color: #f5f5f5;
-  border-radius: 24px;
-  border: 1px solid #e0e0e0;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid rgba(70, 198, 196, 0.3);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+::ng-deep .message-field .mat-mdc-text-field-wrapper:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(70, 198, 196, 0.2);
 }
 
 ::ng-deep .message-field .mat-mdc-form-field-flex {
   padding: 0 12px;
 }
 
+.action-buttons {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .attachment-button {
   margin-right: 8px;
+  flex-shrink: 0;
 }
 
 .send-button {
-  width: 40px;
-  height: 40px;
-  line-height: 40px;
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  background: var(--gradient-primary);
+  color: white;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.send-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .send-button .mat-icon {

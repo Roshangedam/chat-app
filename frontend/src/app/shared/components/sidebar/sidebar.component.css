@@ -13,7 +13,7 @@
 
 .compact-mode .profile-section {
   justify-content: center;
-  padding: 12px 8px;
+  padding: 14px 8px;
 }
 
 .compact-mode .avatar-container {
@@ -30,7 +30,7 @@
   display: flex;
   align-items: center;
   padding: 16px;
-  background-color: #f5f5f5;
+  background-color: #67d2b982;
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
 }
 
@@ -103,7 +103,7 @@
 }
 
 ::ng-deep .mat-mdc-list-item.active .mat-icon {
-  color: #2196f3;
+  color: #4caf50;;
 }
 
 ::ng-deep .mat-mdc-list-item:hover {
@@ -133,7 +133,7 @@
 /* Responsive Adjustments */
 @media (max-width: 768px) {
   .profile-section {
-    padding: 12px;
+    padding: 14px;
   }
 
   .profile-avatar {

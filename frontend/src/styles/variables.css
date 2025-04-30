@@ -7,6 +7,13 @@
   --font-size-md: 1rem;
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-loose: 1.8;
 
   /* Spacing */
   --spacing-xs: 6px;
@@ -18,7 +25,17 @@
   /* Border Radius */
   --border-radius-sm: 8px;
   --border-radius-md: 12px;
-  --border-radius-lg: 20px;
-  --border-radius-xl: 30px;
+  --border-radius-lg: 16px;
+  --border-radius-xl: 24px;
   --border-radius-full: 50%;
+
+  /* Colors - These are duplicated from theme.css for backward compatibility */
+  --color-primary: #46c6c4;
+  --color-primary-light: #77da79;
+  --color-primary-dark: #3aa8a6;
+  --color-secondary: #2196f3;
+  --color-text-primary: #333333;
+  --color-text-secondary: #666666;
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f5f5f5;
 }

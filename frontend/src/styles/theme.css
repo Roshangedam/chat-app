@@ -1,0 +1,162 @@
+/* 
+ * Global Theme Variables
+ * This file contains all the design tokens used across the application
+ */
+
+:root {
+  /* Color Palette */
+  --color-primary: #46c6c4;
+  --color-primary-light: #77da79;
+  --color-primary-dark: #3aa8a6;
+  --color-secondary: #2196f3;
+  --color-secondary-light: #64b5f6;
+  --color-secondary-dark: #1976d2;
+  --color-success: #4caf50;
+  --color-warning: #ff9800;
+  --color-error: #f44336;
+  --color-info: #2196f3;
+  
+  /* Neutral Colors */
+  --color-text-primary: #333333;
+  --color-text-secondary: #666666;
+  --color-text-tertiary: #757575;
+  --color-text-light: #ffffff;
+  --color-text-disabled: #9e9e9e;
+  
+  /* Background Colors */
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f5f5f5;
+  --color-background-tertiary: #e0e0e0;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(to right, #46c6c4, #77da79);
+  --gradient-background: linear-gradient(135deg, #f5f7fa 0%, #e4ecfb 100%);
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 15px 50px rgba(0, 0, 0, 0.2);
+  
+  /* Border Radius */
+  --border-radius-sm: 8px;
+  --border-radius-md: 12px;
+  --border-radius-lg: 16px;
+  --border-radius-xl: 24px;
+  --border-radius-full: 50%;
+  
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  
+  /* Z-index layers */
+  --z-index-base: 1;
+  --z-index-dropdown: 10;
+  --z-index-sticky: 20;
+  --z-index-fixed: 30;
+  --z-index-modal: 40;
+  --z-index-popover: 50;
+  --z-index-tooltip: 60;
+  
+  /* Blur effects */
+  --blur-sm: blur(4px);
+  --blur-md: blur(8px);
+  --blur-lg: blur(16px);
+  
+  /* Animation */
+  --animation-duration-normal: 0.3s;
+  --animation-duration-slow: 0.5s;
+  --animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Card Component Styles */
+.app-card {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.app-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.app-card-header {
+  background: var(--gradient-primary);
+  color: white;
+  padding: 25px 24px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.app-card-header::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+}
+
+.app-card-content {
+  padding: 30px;
+}
+
+/* Button Styles */
+.app-button {
+  border-radius: var(--border-radius-md);
+  padding: 10px 24px;
+  font-weight: 500;
+  transition: all var(--transition-normal);
+}
+
+.app-button-primary {
+  background: var(--gradient-primary);
+  color: white;
+}
+
+.app-button-primary:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* Form Styles */
+.app-form-field {
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+/* Background Pattern Animation */
+@keyframes subtle-float {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 1000px 1000px;
+  }
+}
+
+.animated-background {
+  position: relative;
+}
+
+.animated-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-repeat: repeat;
+  background-size: 1000px 1000px;
+  opacity: 0.8;
+  z-index: 0;
+  animation: subtle-float 60s infinite linear;
+}

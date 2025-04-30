@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200px" height="200px" viewBox="0 0 200 200" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <defs>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="userGradient">
+            <stop stop-color="#46c6c4" offset="0%"></stop>
+            <stop stop-color="#77da79" offset="100%"></stop>
+        </linearGradient>
+        <circle id="user-path" cx="100" cy="100" r="100"></circle>
+        <clipPath id="user-clip">
+            <use xlink:href="#user-path"></use>
+        </clipPath>
+    </defs>
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <use fill="url(#userGradient)" xlink:href="#user-path"></use>
+        <g clip-path="url(#user-clip)">
+            <!-- Background pattern -->
+            <rect fill="#FFFFFF" opacity="0.1" x="0" y="0" width="200" height="200"></rect>
+            <path d="M20,180 C20,180 40,120 100,120 C160,120 180,180 180,180 L180,220 L20,220 L20,180 Z" fill="#FFFFFF" opacity="0.2"></path>
+            
+            <!-- User silhouette -->
+            <circle fill="#FFFFFF" opacity="0.3" cx="100" cy="75" r="35"></circle>
+            <path d="M100,115 C70,115 50,145 45,180 L155,180 C150,145 130,115 100,115 Z" fill="#FFFFFF" opacity="0.3"></path>
+        </g>
+        
+        <!-- Subtle highlight -->
+        <path d="M100,10 C48.9543,10 8,50.9543 8,102 C8,153.046 48.9543,194 100,194 C151.046,194 192,153.046 192,102 C192,50.9543 151.046,10 100,10 Z" stroke="#FFFFFF" stroke-width="2" opacity="0.4"></path>
+    </g>
+</svg>

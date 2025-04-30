@@ -7,52 +7,40 @@
   <!-- Conversation Info -->
   <div class="conversation-info">
     <div class="name-with-status">
-      <h2 class="conversation-name" [matTooltip]="getConversationName()">
-        {{ getConversationName() }}
-      </h2>
-    </div>
-    <div class="status-line">
-      <app-status-indicator
-        *ngIf="!conversation?.groupChat && getOtherParticipant()"
-        [userId]="getOtherParticipant()?.id"
-        size="small"
-        [matTooltip]="getStatusText()"
-      >
-      </app-status-indicator>
-      <div class="status-text" *ngIf="getStatusText()">
-        <span>{{ getStatusText() }}</span>
+      <div class="avatar">
+        <img [src]="getAvatarUrl()" alt="Avatar">
+        <app-status-indicator class="status-indicator" *ngIf="!conversation?.groupChat && getOtherParticipant()"
+          [userId]="getOtherParticipant()?.id" size="normal" [matTooltip]="getStatusText()">
+        </app-status-indicator>
+      </div>
+      <div class="conversation-line">
+        <h2 class="conversation-name" [matTooltip]="getConversationName()">
+          {{ getConversationName() }}
+        </h2>
+        <div class="status-text" *ngIf="getStatusText()">
+          <span>{{ getStatusText() }}</span>
+        </div>
       </div>
     </div>
+
+
+
   </div>
 
   <!-- Header Actions -->
   <div class="header-actions">
     <!-- Voice Call Button (conditionally shown) -->
-    <button
-      *ngIf="showCallButtons"
-      mat-icon-button
-      matTooltip="Voice Call"
-      (click)="onVoiceCallClick()"
-    >
+    <button *ngIf="showCallButtons" mat-icon-button matTooltip="Voice Call" (click)="onVoiceCallClick()">
       <mat-icon>call</mat-icon>
     </button>
 
     <!-- Video Call Button (conditionally shown) -->
-    <button
-      *ngIf="showCallButtons"
-      mat-icon-button
-      matTooltip="Video Call"
-      (click)="onVideoCallClick()"
-    >
+    <button *ngIf="showCallButtons" mat-icon-button matTooltip="Video Call" (click)="onVideoCallClick()">
       <mat-icon>videocam</mat-icon>
     </button>
 
     <!-- Menu Button (always shown) -->
-    <button
-      mat-icon-button
-      [matMenuTriggerFor]="menu"
-      matTooltip="More options"
-    >
+    <button mat-icon-button [matMenuTriggerFor]="menu" matTooltip="More options">
       <mat-icon>more_vert</mat-icon>
     </button>
 
@@ -61,11 +49,7 @@
         <mat-icon>search</mat-icon>
         <span>Search</span>
       </button>
-      <button
-        mat-menu-item
-        *ngIf="conversation?.groupChat"
-        (click)="onMenuAction('participants')"
-      >
+      <button mat-menu-item *ngIf="conversation?.groupChat" (click)="onMenuAction('participants')">
         <mat-icon>group</mat-icon>
         <span>View participants</span>
       </button>
@@ -76,5 +60,3 @@
     </mat-menu>
   </div>
 </div>
-
-

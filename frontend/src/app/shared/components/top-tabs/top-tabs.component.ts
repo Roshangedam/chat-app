@@ -11,7 +11,6 @@ import { AuthService } from '../../../core/auth/services/auth.service';
 import { User } from '../../../core/auth/services/auth.service';
 import { UserStatusService } from '../../../features/chat/api/services/user-status.service';
 import { Subscription } from 'rxjs';
-import { StatusIndicatorComponent } from '../status-indicator/status-indicator.component';
 
 @Component({
   selector: 'app-top-tabs',
@@ -22,8 +21,7 @@ import { StatusIndicatorComponent } from '../status-indicator/status-indicator.c
     MatIconModule,
     MatBadgeModule,
     MatButtonModule,
-    MatMenuModule,
-    StatusIndicatorComponent
+    MatMenuModule
   ],
   templateUrl: './top-tabs.component.html',
   styleUrls: ['./top-tabs.component.css']

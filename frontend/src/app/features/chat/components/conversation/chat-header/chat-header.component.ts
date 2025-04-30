@@ -43,8 +43,7 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
   @Input() currentUserId: string | number | null = null;
 
   @Output() backClick = new EventEmitter<void>();
-  @Output() menuAction = new EventEmitter<string>();
-
+  @Output() menuAction = new EventEmitter<string>();  
   // Cached values to prevent unnecessary recalculations
   private _cachedConversationName: string = '';
   private _cachedStatusText: string = '';
@@ -705,5 +704,9 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
    */
   onVideoCallClick(): void {
     this.menuAction.emit('video-call');
+  }
+
+  getAvatarUrl(): string {
+    return  'assets/images/user-avatar.svg';
   }
 }

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200px" height="200px" viewBox="0 0 200 200" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <defs>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="groupGradient">
+            <stop stop-color="#46c6c4" offset="0%"></stop>
+            <stop stop-color="#77da79" offset="100%"></stop>
+        </linearGradient>
+        <circle id="group-path" cx="100" cy="100" r="100"></circle>
+        <clipPath id="group-clip">
+            <use xlink:href="#group-path"></use>
+        </clipPath>
+    </defs>
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <use fill="url(#groupGradient)" xlink:href="#group-path"></use>
+        <g clip-path="url(#group-clip)">
+            <!-- Background pattern -->
+            <rect fill="#FFFFFF" opacity="0.1" x="0" y="0" width="200" height="200"></rect>
+            
+            <!-- Multiple user silhouettes -->
+            <!-- Center user -->
+            <circle fill="#FFFFFF" opacity="0.3" cx="100" cy="70" r="25"></circle>
+            <path d="M100,100 C80,100 65,120 60,145 L140,145 C135,120 120,100 100,100 Z" fill="#FFFFFF" opacity="0.3"></path>
+            
+            <!-- Left user -->
+            <circle fill="#FFFFFF" opacity="0.25" cx="60" cy="80" r="20"></circle>
+            <path d="M60,105 C45,105 35,120 30,140 L90,140 C85,120 75,105 60,105 Z" fill="#FFFFFF" opacity="0.25"></path>
+            
+            <!-- Right user -->
+            <circle fill="#FFFFFF" opacity="0.25" cx="140" cy="80" r="20"></circle>
+            <path d="M140,105 C125,105 115,120 110,140 L170,140 C165,120 155,105 140,105 Z" fill="#FFFFFF" opacity="0.25"></path>
+            
+            <!-- Bottom area -->
+            <path d="M20,180 C20,180 40,150 100,150 C160,150 180,180 180,180 L180,220 L20,220 L20,180 Z" fill="#FFFFFF" opacity="0.2"></path>
+        </g>
+        
+        <!-- Subtle highlight -->
+        <path d="M100,10 C48.9543,10 8,50.9543 8,102 C8,153.046 48.9543,194 100,194 C151.046,194 192,153.046 192,102 C192,50.9543 151.046,10 100,10 Z" stroke="#FFFFFF" stroke-width="2" opacity="0.4"></path>
+    </g>
+</svg>

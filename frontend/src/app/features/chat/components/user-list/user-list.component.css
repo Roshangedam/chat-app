@@ -7,12 +7,22 @@
 
 .search-container {
   padding: 16px;
-  background-color: #fff;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Search and Action Bar */
+.list-header {
+  display: flex;
+  align-items: center;
+  height: 60px;
+  padding: 8px 16px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  z-index: 2;
 }
 
 .search-field {
-  width: 100%;
+  flex: 1;
 }
 
 ::ng-deep .search-field .mat-mdc-form-field-subscript-wrapper {
@@ -49,7 +59,9 @@ mat-list {
 }
 
 .user-item:hover {
-  background-color: #f5f5f5;
+  background-color: rgba(70, 198, 196, 0.05);
+  transform: translateY(-2px);
+  transition: transform 0.3s ease, background-color 0.3s ease;
 }
 
 mat-list-item {
@@ -88,5 +100,5 @@ mat-list-item {
 }
 
 .chat-button {
-  color: #2196f3;
+  color: var(--color-primary);
 }

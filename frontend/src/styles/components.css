@@ -1,0 +1,270 @@
+/* 
+ * Shared Component Styles
+ * This file contains reusable component styles that can be applied across the application
+ */
+
+/* Card Components */
+.card {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.card-header {
+  background: var(--gradient-primary);
+  color: white;
+  padding: 25px 24px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-header::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+}
+
+.card-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: white;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.card-subtitle {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: var(--font-weight-normal);
+  position: relative;
+}
+
+.card-content {
+  padding: 30px;
+}
+
+/* Form Components */
+.form-field {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin: 16px 0;
+}
+
+.form-actions button {
+  width: 100%;
+  height: 44px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Button Components */
+.btn-primary {
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-md);
+  padding: 10px 24px;
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-normal);
+}
+
+.btn-primary:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background-color: white;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-background-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 10px 24px;
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-normal);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-background-secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Divider Component */
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 24px 0;
+  color: var(--color-text-tertiary);
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--color-background-tertiary);
+}
+
+.divider span {
+  padding: 0 10px;
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Avatar Components */
+.avatar {
+  border-radius: var(--border-radius-full);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.avatar-sm {
+  width: 32px;
+  height: 32px;
+}
+
+.avatar-md {
+  width: 40px;
+  height: 40px;
+}
+
+.avatar-lg {
+  width: 64px;
+  height: 64px;
+}
+
+.avatar-xl {
+  width: 120px;
+  height: 120px;
+  border: 3px solid white;
+  box-shadow: var(--shadow-md);
+}
+
+/* Message Components */
+.message-bubble {
+  border-radius: 18px;
+  padding: 8px 16px;
+  position: relative;
+  max-width: 70%;
+}
+
+.message-bubble-own {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+}
+
+.message-bubble-other {
+  background-color: #f1f0f0;
+  color: var(--color-text-primary);
+}
+
+/* Status Indicators */
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--border-radius-full);
+  border: 2px solid white;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+}
+
+.status-online {
+  background-color: var(--color-success);
+}
+
+.status-away {
+  background-color: var(--color-warning);
+}
+
+.status-offline {
+  background-color: var(--color-text-disabled);
+}
+
+/* Notification Components */
+.notification {
+  padding: 12px;
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 16px;
+  font-size: var(--font-size-sm);
+}
+
+.notification-error {
+  background-color: #ffebee;
+  color: var(--color-error);
+}
+
+.notification-success {
+  background-color: #e8f5e9;
+  color: var(--color-success);
+}
+
+.notification-warning {
+  background-color: #fff8e1;
+  color: var(--color-warning);
+}
+
+.notification-info {
+  background-color: #e3f2fd;
+  color: var(--color-info);
+}
+
+/* Background Patterns */
+.pattern-background {
+  position: relative;
+  background-image: var(--gradient-background);
+}
+
+.pattern-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-repeat: repeat;
+  background-size: 1000px 1000px;
+  opacity: 0.8;
+  z-index: 0;
+  animation: subtle-float 60s infinite linear;
+}
+
+/* Responsive Utilities */
+@media (max-width: 599px) {
+  .card {
+    border-radius: var(--border-radius-md);
+  }
+  
+  .card-content {
+    padding: 20px;
+  }
+  
+  .message-bubble {
+    max-width: 85%;
+  }
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    padding: 20px 16px 16px;
+  }
+  
+  .card-title {
+    font-size: var(--font-size-lg);
+  }
+}

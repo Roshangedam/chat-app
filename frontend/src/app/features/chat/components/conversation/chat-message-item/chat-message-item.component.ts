@@ -54,7 +54,7 @@ export class ChatMessageItemComponent implements OnChanges {
    * Get the avatar URL or a default avatar
    */
   getAvatarUrl(): string {
-    return this.message.senderAvatarUrl || 'assets/images/user-avatar.png';
+    return this.message.senderAvatarUrl || 'assets/images/user-avatar.svg';
   }
 
   /**

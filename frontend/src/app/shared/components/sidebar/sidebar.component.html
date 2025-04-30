@@ -1,9 +1,9 @@
 <div class="sidebar-container" [class.compact-mode]="compactMode">
   <!-- Profile Section -->
   <div class="profile-section">
-    <div class="avatar-container">
+    <div class="avatar-container" [matMenuTriggerFor]="profileMenu" >
       <img
-        [src]="currentUser?.avatarUrl || 'assets/images/default-avatar.png'"
+        [src]="currentUser?.avatarUrl || 'assets/images/user-avatar.svg'"
         alt="Profile Picture"
         class="profile-avatar"
         [matTooltip]="compactMode ? (currentUser?.fullName || currentUser?.username || 'Guest User') : ''"
@@ -17,9 +17,9 @@
       <p class="profile-status">{{ getUserStatus() | titlecase }}</p>
     </div>
 
-    <button mat-icon-button [matMenuTriggerFor]="profileMenu" aria-label="Profile menu">
+    <!-- <button mat-icon-button [matMenuTriggerFor]="profileMenu" aria-label="Profile menu">
       <mat-icon>more_vert</mat-icon>
-    </button>
+    </button> -->
 
     <mat-menu #profileMenu="matMenu">
       <button mat-menu-item routerLink="/auth/profile">

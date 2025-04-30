@@ -10,6 +10,7 @@
 .list-header {
   display: flex;
   align-items: center;
+  height: 60px;
   padding: 8px 16px;
   background-color: #f5f5f5;
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
@@ -18,7 +19,6 @@
 
 .search-field {
   flex: 1;
-  margin-bottom: -1.25em; /* Reduce bottom margin */
 }
 
 /* Fix for Angular Material styling */

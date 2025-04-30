@@ -43,11 +43,35 @@
   flex: 1; /* Take available space */
 }
 
-.status-line {
+
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  width: 36px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.conversation-line {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
+  flex-direction: column;
+  align-items: left;
+  gap: 4px;
 }
 
 .status-text {
@@ -60,15 +84,11 @@
   text-overflow: ellipsis;
 }
 
-.status-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
-  flex-shrink: 0; /* Prevent the indicator from shrinking */
-  position: relative;
-  display: inline-block;
-  vertical-align: middle;
+.status-indicator {  
+  bottom: 10px;
+  left: 87px;
+  width: 11px;
+  height: 11px;
 }
 
 .status-indicator.online {
@@ -206,5 +226,10 @@
     height: 18px;
     line-height: 18px;
   }
-}
 
+  
+.status-indicator {  
+  bottom: 7px;
+  left: 80px;
+}
+}

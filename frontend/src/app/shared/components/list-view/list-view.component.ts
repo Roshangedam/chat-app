@@ -182,9 +182,9 @@ export class ListViewComponent implements OnInit, OnDestroy {
 
   getAvatarUrl(item: any): string {
     if ('avatarUrl' in item) {
-      return item.avatarUrl || 'assets/images/default-avatar.png';
+      return item.avatarUrl || 'assets/images/user-avatar.svg';
     } else {
-      return item.avatarUrl || 'assets/images/default-avatar.png';
+      return item.avatarUrl || 'assets/images/user-avatar.svg';
     }
   }
 

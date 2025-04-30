@@ -15,21 +15,23 @@
       </mat-error>
     </mat-form-field>
 
-    <button
-      mat-icon-button
-      type="button"
-      class="attachment-button"
-      [disabled]="disabled">
-      <mat-icon>attach_file</mat-icon>
-    </button>
+    <div class="action-buttons">
+      <button
+        mat-icon-button
+        type="button"
+        class="attachment-button"
+        [disabled]="disabled">
+        <mat-icon>attach_file</mat-icon>
+      </button>
 
-    <button
-      mat-fab
-      color="primary"
-      type="submit"
-      class="send-button"
-      [disabled]="messageForm.invalid || disabled">
-      <mat-icon>send</mat-icon>
-    </button>
+      <button
+        mat-fab
+        color="primary"
+        type="submit"
+        class="send-button"
+        [disabled]="messageForm.invalid || disabled">
+        <mat-icon>send</mat-icon>
+      </button>
+    </div>
   </form>
 </div>
