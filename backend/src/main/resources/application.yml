@@ -5,7 +5,7 @@ spring:
 
   # Database Configuration
   datasource:
-    url: jdbc:mysql://localhost:3306/chatapp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/chatapp?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true
     username: root
     password: roshan
     driver-class-name: com.mysql.cj.jdbc.Driver
