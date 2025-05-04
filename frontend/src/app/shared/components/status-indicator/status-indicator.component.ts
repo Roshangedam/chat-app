@@ -123,11 +123,11 @@ export class StatusIndicatorComponent implements OnInit, OnChanges, OnDestroy {
     // Subscribe to status updates
     this.subscriptions.add(
       this.statusService.getUserStatusUpdates(this.userId).subscribe(status => {
-        if (status !== this.currentStatus) {
-          this.currentStatus = status;
-          this.updateStatusClass();
-          this.cdr.markForCheck();
-        }
+        console.log(`StatusIndicator: Received status update for user ${this.userId}: ${status}`);
+        this.currentStatus = status;
+        this.updateStatusClass();
+        // Always mark for check to ensure the component is updated
+        this.cdr.markForCheck();
       })
     );
   }
@@ -141,10 +141,11 @@ export class StatusIndicatorComponent implements OnInit, OnChanges, OnDestroy {
     // First priority: Use the status from the StatusService if we have a userId
     if (this.userId) {
       try {
-        this.currentStatus = this.statusService.getUserStatus(this.userId);
+        // Use the current status that we're tracking from the subscription
         statusValue = this.currentStatus.toLowerCase();
+        console.log(`StatusIndicator: Using status ${statusValue} for user ${this.userId}`);
       } catch (error) {
-        console.error(`StatusIndicator: Error getting status for user ${this.userId}`, error);
+        console.error(`StatusIndicator: Error using status for user ${this.userId}`, error);
         statusValue = 'offline'; // Default to offline on error
       }
     }
@@ -164,6 +165,13 @@ export class StatusIndicatorComponent implements OnInit, OnChanges, OnDestroy {
     }
 
     // Add size class
-    this.statusClass = `${statusValue} ${this.size}`;
+    const newStatusClass = `${statusValue} ${this.size}`;
+
+    // Only update if the class has changed to avoid unnecessary renders
+    if (this.statusClass !== newStatusClass) {
+      console.log(`StatusIndicator: Updating status class from ${this.statusClass} to ${newStatusClass}`);
+      this.statusClass = newStatusClass;
+      this.cdr.markForCheck();
+    }
   }
 }

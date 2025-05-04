@@ -239,6 +239,10 @@ export class AuthService {
             userStatusService.updateStatus('OFFLINE').subscribe({
               next: () => {
                 this.loggingService.logInfo('User status set to OFFLINE');
+                // Force a refresh to ensure all status indicators update
+                if (typeof userStatusService.forceRefresh === 'function') {
+                  userStatusService.forceRefresh();
+                }
                 this.completeLogout(username);
               },
               error: (err) => {
@@ -626,7 +630,13 @@ export class AuthService {
 
                 // Then update current user status to ONLINE
                 userStatusService.updateStatus('ONLINE').subscribe({
-                  next: () => this.loggingService.logInfo('User status set to ONLINE'),
+                  next: () => {
+                    this.loggingService.logInfo('User status set to ONLINE');
+                    // Force a refresh to ensure all status indicators update
+                    if (typeof userStatusService.forceRefresh === 'function') {
+                      userStatusService.forceRefresh();
+                    }
+                  },
                   error: (err) => this.loggingService.logError('Failed to set user status to ONLINE', err)
                 });
               },

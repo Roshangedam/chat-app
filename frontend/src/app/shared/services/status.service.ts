@@ -1,6 +1,6 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import { BehaviorSubject, Observable, Subject, Subscription, of } from 'rxjs';
-import { debounceTime, distinctUntilChanged, map, shareReplay } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, map, shareReplay, tap } from 'rxjs/operators';
 import { UserStatusService } from '../../features/chat/api/services/user-status.service';
 
 export type UserStatus = 'ONLINE' | 'AWAY' | 'OFFLINE';
@@ -61,6 +61,15 @@ export class StatusService implements OnDestroy {
         lastSeenMap.forEach((lastSeen, userId) => {
           this.lastSeenCache.set(String(userId), lastSeen);
         });
+      })
+    );
+
+    // Subscribe to force refresh events
+    this.subscriptions.add(
+      this.userStatusService.forceRefresh$.subscribe(() => {
+        console.log('StatusService: Received force refresh event');
+        // Create a new map to force change detection
+        this.userStatusMapSubject.next(new Map(this.userStatusMapSubject.value));
       })
     );
 
