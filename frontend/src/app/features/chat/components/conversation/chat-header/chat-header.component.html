@@ -9,15 +9,8 @@
     <div class="name-with-status">
       <div class="avatar">
         <img [src]="getAvatarUrl()" alt="Avatar">
-        <app-status-indicator
-          class="status-indicator"
-          *ngIf="!conversation?.groupChat && getOtherParticipant()"
-          [userId]="getOtherParticipant()?.id"
-          size="normal"
-          [matTooltip]="getStatusText()"
-          [refreshInterval]="60000"
-          (statusChange)="onStatusChange($event)"
-          (statusClick)="onStatusClick($event)">
+        <app-status-indicator class="status-indicator" *ngIf="!conversation?.groupChat && getOtherParticipant()"
+          [userId]="getOtherParticipant()?.id" size="normal" [matTooltip]="getStatusText()">
         </app-status-indicator>
       </div>
       <div class="conversation-line">
