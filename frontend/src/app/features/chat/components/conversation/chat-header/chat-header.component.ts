@@ -6,7 +6,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ChatConversation, ChatUser } from '../../../api/models';
 import { DateFormatterUtils } from '../../../../../shared/utils/date-formatter.utils';
-import { StatusService } from '../../../../../shared/services/status.service';
+import { StatusService, UserStatus } from '../../../../../shared/services/status.service';
 import { StatusIndicatorComponent } from '../../../../../shared/components/status-indicator/status-indicator.component';
 import { Subscription, catchError, of, tap } from 'rxjs';
 import { UserApiService } from '../../../api/services/user-api.service';
@@ -43,7 +43,7 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
   @Input() currentUserId: string | number | null = null;
 
   @Output() backClick = new EventEmitter<void>();
-  @Output() menuAction = new EventEmitter<string>();  
+  @Output() menuAction = new EventEmitter<string>();
   // Cached values to prevent unnecessary recalculations
   private _cachedConversationName: string = '';
   private _cachedStatusText: string = '';
@@ -704,6 +704,36 @@ export class ChatHeaderComponent implements OnChanges, OnDestroy {
    */
   onVideoCallClick(): void {
     this.menuAction.emit('video-call');
+  }
+
+  /**
+   * Handle status change events from the status indicator
+   * @param status The new status
+   */
+  onStatusChange(status: UserStatus): void {
+    console.log(`ChatHeader: Status changed to ${status}`);
+
+    // Clear cached values to force recalculation
+    this._cachedStatusText = '';
+    this._cachedStatusClass = '';
+
+    // Manually trigger change detection
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Handle status indicator click events
+   * @param event The status click event
+   */
+  onStatusClick(event: {userId: string | number | null, status: UserStatus}): void {
+    console.log(`ChatHeader: Status indicator clicked for user ${event.userId} with status ${event.status}`);
+
+    // Clear cached values to force recalculation
+    this._cachedStatusText = '';
+    this._cachedStatusClass = '';
+
+    // Manually trigger change detection
+    this.cdr.markForCheck();
   }
 
   getAvatarUrl(): string {
